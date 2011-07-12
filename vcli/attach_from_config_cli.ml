@@ -1,0 +1,10 @@
+let rpc path xml = Xmlrpcclient.do_xml_rpc ~version:"1.0" ~host:"localhost" ~port:4094 ~path xml
+
+let _ =
+	let cmdname = Sys.argv.(0) in
+	let name = Filename.basename cmdname in
+	let sm = String.sub name 0 (String.length name - 2) in
+	let rpc xml = 
+		rpc (Printf.sprintf "/%s" sm) xml
+	in
+	Printf.printf "%s\n" (Smapi_client.VDI.attach_from_config rpc Sys.argv.(1))

@@ -1,0 +1,96 @@
+#! /bin/bash
+#
+# vhdd 	Starts and stops the VHD daemon
+#
+# chkconfig: 2345 21 77
+# description: vhd daemon
+# processname: vhdd 
+# pidfile: /var/run/vhdd.pid
+
+# Source function library.
+. /etc/init.d/functions
+
+# location of the executable:
+VHDD="/opt/xensource/libexec/vhdd"
+
+# pidfile:
+PID_FILE="/var/run/vhdd.pid"
+
+# lock file
+SUBSYS_FILE="/var/lock/subsys/vhdd"
+
+start() {
+	echo -n $"Starting the vhd daemon: "
+
+	export OCAMLRUNPARAM=b
+
+	if [ -e ${SUBSYS_FILE} ]; then
+		if [ -e ${PID_FILE} ] && [ -e /proc/`cat ${PID_FILE}` ]; then
+			echo -n $"cannot start vhdd: already running."
+			failure $"cannot start vhdd: already running."
+			echo
+			return 1
+		fi
+	fi
+	
+	${VHDD} -pidfile ${PID_FILE} 
+
+	MAX_RETRIES=30
+	RETRY=0
+	while [ ${RETRY} -lt ${MAX_RETRIES} ]; do
+		PID=$(pidof vhdd)
+		kill -0 ${PID} 2> /dev/null
+		if [ $? -eq 0 ]; then
+			touch ${SUBSYS_FILE}
+			success
+			echo
+			return 0
+		fi
+		sleep 1
+		echo -n .
+		RETRY=$(( ${RETRY} + 1 ))
+	done
+	echo -n $"failed to start vhdd."
+	failure $"failed to start vhdd."
+	killproc vhdd
+	rm -f ${SUBSYS_FILE} ${PID_FILE}
+	echo
+	return 1
+}
+
+stop() {
+	echo -n $"Stopping the vhd daemon: "
+
+	if [ ! -e ${SUBSYS_FILE} ]; then
+		echo -n $"cannot stop vhdd: vhdd is not running."
+		failure $"cannot stop vhdd: vhdd is not running."
+		echo
+		return 1;
+	fi
+
+	killproc vhdd
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f ${SUBSYS_FILE}
+	return $RETVAL
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		restart
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart}"
+		exit 1
+esac

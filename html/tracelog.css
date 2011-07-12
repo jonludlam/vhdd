@@ -1,0 +1,56 @@
+body {font-family:sans; font-size: xx-small; background:#ddd}
+span {
+     font-size:large;
+     font-weight:bold;
+}
+h1 {clear:both;}
+div.attached_as_master {
+     background:#fff;
+     border:1px solid #aaa;
+     padding:10px;
+     float:left;
+     margin-bottom:30px;
+}
+div.attached_as_slave {
+     background:#fff;
+     border:1px solid #aaa;
+     padding:10px;
+     float:left;
+    margin-bottom:30px;
+}
+div.debug {
+     background:#fff;
+     border:1px solid #aaa;
+     padding:10px;
+     float:left;
+    margin-bottom:30px;
+}
+table {border-collapse: collapse;
+border:1px solid #aaa;
+font-size:xx-small;
+}
+td { margin:0px;
+     padding: 2px;
+/*     padding-right:10px;*/
+     max-width:350px;
+}
+thead th {
+text-transform:uppercase;
+/*text-align:left;*/
+background:#000;
+color:#fff;
+border:1px solid #888;
+/*padding-right:30px;*/
+}
+
+tr {
+	background:#eef;
+}
+
+tr.oddrow {
+        background:#ddf;
+}
+
+.locked {
+	background:#aad;
+}
