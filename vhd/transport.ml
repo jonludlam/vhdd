@@ -64,6 +64,8 @@ let attach ty sr_uuid gp is_create =
 			let sr_path_real = Smapi.mount_path sr_uuid in
 			debug "About to unlink %s" sr_path_real;
 			Unixext.unlink_safe sr_path_real;
+			let localpath = "/var/run/sr-mount" in
+	       		Unixext.mkdir_rec localpath 0700;
 			Unix.symlink sr_path sr_path_real;
                         sr_path_real
  		| File Nfs ->
