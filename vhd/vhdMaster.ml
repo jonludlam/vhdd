@@ -586,6 +586,23 @@ end
 			| File Ext ->
 				(* Nb, we don't get here - we can probe at the transport layer *)
 				Xml.Element("SRlist",[],[])
+			| File FLocal ->
+			        let rec inner acc dh =
+					try
+						inner ((Unix.readdir dh)::acc) dh
+					with End_of_file ->
+						acc
+				in
+				let is_dir fname =
+					let st = Unix.stat (Printf.sprintf "%s/%s" path fname) in
+					match st.Unix.st_kind with
+						| Unix.S_DIR -> true
+						| _ -> false
+				in
+				let files = List.filter (fun f -> f<>"." && f<>"..") (Unixext.with_directory path (inner [])) in
+				let srs = List.filter (fun f -> (*(Uuid.is_uuid f) &&*) (is_dir f)) files in
+				Xml.Element("SRlist",[],
+				List.map (fun f -> Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData f])])) srs)
 
 	(* TODO: Fix up xapi's database. This currently only kicks off the coalesce process *)
 	let scan context driver generic_params sr =

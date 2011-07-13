@@ -12,6 +12,7 @@ type lvm_type =
 type file_type =
 	| Ext
 	| Nfs
+        | FLocal
 
 type sm_type =
 	| Lvm of lvm_type
@@ -29,6 +30,7 @@ let nfs = "nfs"
 let ext = "ext"
 let iscsi = "ISCSI"
 let hba = "HBA"
+let local = "local"
 
 (* Parameters *)
 
@@ -50,6 +52,9 @@ let server_p = {key=server; description=""}
 let serverpath = "serverpath" (* nfs *)
 let serverpath_p = {key=serverpath; description=""}
 
+let localpath = "localpath"
+let localpath_p = {key=localpath; description=""}
+
 (* Hidden *)
 let localiqn = "localIQN" 
 let localiqn_p = {key=localiqn; description=""}
@@ -69,7 +74,8 @@ let drivers = [
 	lvmnewiscsi, Lvm Iscsi;
 	lvmnewfc,    Lvm Fc;
 	nfs,         File Nfs;
-	ext,         File Ext]
+	ext,         File Ext;
+        local,       File FLocal; ]
 
 let driver_config = [
 	lvmorig, [device_p];
@@ -79,7 +85,8 @@ let driver_config = [
 	lvmorigfc, [scsiid_p];
 	lvmnewfc, [scsiid_p];
 	nfs, [server_p;serverpath_p];
-	ext, [device_p]]
+	ext, [device_p];
+        local, [localpath_p]]
 	
 let get_all_driver_names () =
 	List.map fst drivers

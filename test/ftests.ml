@@ -1599,6 +1599,7 @@ let _ =
 	let server=ref "" in
 	let serverpath=ref "" in
 	let backend =ref "lvmnew" in
+	let localpath = ref "/tmp/" in
 
 	Arg.parse [
 		"-r", Arg.Set real, "Real mode (default is dummy)";
@@ -1612,6 +1613,7 @@ let _ =
 		"-targetiqn", Arg.Set_string targetiqn, "Set the ISCSI target IQN";
 		"-server",Arg.Set_string server, "Set the NFS server";
 		"-serverpath",Arg.Set_string serverpath, "Set the NFS serverpath";
+		"-localpath",Arg.Set_string localpath, "Set the local path";
 		"-scsiid", Arg.Set_string scsiid, "Set the ISCSI SCSI id"]
 		(fun _ -> failwith "Invalid argument")
 		"Usage:\n\ttest [-m] [-h hosts] [-target target] [-targetiqn targetiqn] [-scsiid scsiid]\n\n";
@@ -1634,7 +1636,11 @@ let _ =
 			| "nfs" -> 
 				can_create_raw := false;
 				["server",!server;
-				"serverpath",!serverpath];
+				"serverpath",!serverpath]
+			| "local" -> 
+			        can_create_raw := false;
+			        ["localpath",!localpath]
+			| _ -> failwith (Printf.sprintf "Unknown backend %s" !backend)
 	);
 				
 	(Real.uri := Printf.sprintf "/%s" !backend);

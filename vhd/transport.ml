@@ -53,7 +53,20 @@ let attach ty sr_uuid gp is_create =
 			let scsiid = safe_assoc Drivers.scsiid device_config in
 			let path = Smapi_client.VDI.attach (Smapi_client.execrpc Drivers.hba) gp sr scsiid true in
 			path
-		| File Nfs ->
+                | File FLocal ->
+                        let path = safe_assoc Drivers.localpath device_config in
+                        let _ = Unix.stat path in
+                        let sr_path = Printf.sprintf "%s/%s" path sr_uuid in
+                        if is_create then begin
+                    		Unix.mkdir sr_path 0o777
+                        end;
+                        let _ = Unix.stat sr_path in
+			let sr_path_real = Smapi.mount_path sr_uuid in
+			debug "About to unlink %s" sr_path_real;
+			Unixext.unlink_safe sr_path_real;
+			Unix.symlink sr_path sr_path_real;
+                        sr_path_real
+ 		| File Nfs ->
 			if is_create then begin
 				(* Temporarily mount the parent directory in the NFS server in order to create the SR *)
 				let server = safe_assoc Drivers.server device_config in
@@ -145,10 +158,15 @@ let detach ty sr_uuid gp =
 			let scsiid = safe_assoc Drivers.scsiid device_config in
 			let _ = Smapi_client.VDI.detach (Smapi_client.execrpc Drivers.hba) gp sr scsiid in
 			Smapi_client.SR.detach (Smapi_client.execrpc Drivers.hba) gp sr
+		| File FLocal -> 
+		  let sr_mount_path = (Smapi.mount_path sr_uuid) in
+		  debug "About to unlink %s" sr_mount_path;
+		  (try Unixext.unlink_safe sr_mount_path with _ -> ())
 		| File Nfs ->
 			let localpath = Smapi.mount_path sr_uuid in
 			if is_mounted localpath then
 				Nfs.unmount localpath
+
 		| File Ext ->
 			let localpath = Smapi.mount_path sr_uuid in
 
@@ -311,6 +329,9 @@ let probe ty gp continuation =
 					debug "Caught exception while probing: %s" (Printexc.to_string e);
 					nothing
 			end
+		| File FLocal ->
+		  continuation (safe_assoc Drivers.localpath device_config)
+		    
 
 let delete ty sr_uuid gp path =
 	let env = [||] in
@@ -339,6 +360,11 @@ let delete ty sr_uuid gp path =
 		| Lvm Fc ->
 			ignore(Forkhelpers.execute_command_get_output ~env "/bin/dd" ["if=/dev/zero";(Printf.sprintf "of=%s" path);"bs=512";"count=4";"oflag=direct"]);
 			detach ty sr_uuid gp
+		| File FLocal ->
+			do_file_delete ();
+		  let path = safe_assoc Drivers.localpath device_config in
+		  Unix.rmdir (Printf.sprintf "%s/%s" path sr_uuid);
+		  detach ty sr_uuid gp
 		| File Ext ->
 			do_file_delete ();
 			detach ty sr_uuid gp;
@@ -356,3 +382,4 @@ let delete ty sr_uuid gp path =
 			with e ->
 				error "Caught error while deleting SR! %s" (Printexc.to_string e);
 				raise e
+			  
