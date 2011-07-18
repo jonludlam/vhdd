@@ -285,6 +285,8 @@ let _ =
 
 	Unixext.pidfile_write !Global.pidfile;
 
+        Unixext.mkdir_rec "/var/run/sr-mount" 0o755;
+
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
 	watchdog server_init
