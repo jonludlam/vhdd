@@ -5,7 +5,7 @@ open Threadext
 module D=Debug.Debugger(struct let name="tapdisk" end)
 open D
 
-let dummy_vhd = "/var/sm/dummy.vhd"
+let dummy_vhd = "/var/run/vhdd/dummy.vhd"
 
 let my_context = ref (Tapctl.create ())
 let ctx () = !my_context

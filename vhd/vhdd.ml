@@ -108,7 +108,7 @@ let server_init () =
 	Unix.setsockopt localhost_sock Unix.SO_REUSEADDR true;
 	ignore(Http_svr.start (localhost_sock, "inet-RPC"));
 
-	(* Reattach using the /var/sm/attachments.xml file *)
+	(* Reattach using the /var/run/vhdd/attachments.xml file *)
 
 	let previously_attached = Attachments.read_attachments () in
 	List.iter Vhdsm.SR.reattach previously_attached;

@@ -7,7 +7,7 @@ open Int_types
 module D=Debug.Debugger(struct let name="attachments" end)
 open D
 
-let get_log_file () = Printf.sprintf "%s/var/sm/attachments.json" (Global.get_host_local_dummydir ())
+let get_log_file () = Printf.sprintf "%s/var/run/vhdd/attachments.json" (Global.get_host_local_dummydir ())
 
 type sr_info = {
 	drivertype : string;

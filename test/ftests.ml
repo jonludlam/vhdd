@@ -126,10 +126,10 @@ module Dummy = struct
 		Thread.delay 0.1;
 		let unwanted_dirs = [
 			"/tmp/dummytest/1/dev";
-			"/tmp/dummytest/1/var/sm";
+			"/tmp/dummytest/1/var/run/vhdd";
 			"/tmp/dummytest/1/var/xapi";
 			"/tmp/dummytest/2/dev";
-			"/tmp/dummytest/2/var/sm";
+			"/tmp/dummytest/2/var/run/vhdd";
 			"/tmp/dummytest/2/var/xapi";
 			"/tmp/dummytest/dev" ] in
 		List.iter (fun dir -> ignore(Sys.command (Printf.sprintf "rm -rf %s" dir))) unwanted_dirs

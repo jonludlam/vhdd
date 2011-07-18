@@ -11,7 +11,7 @@ module D = Debug.Debugger(struct let name="vhdSlave" end)
 open D
 
 let get_slave_attach_dir sr_uuid =
-	Printf.sprintf "%s/var/sm/slave_attach/%s" (Global.get_host_local_dummydir ()) sr_uuid
+	Printf.sprintf "%s/var/run/vhdd/slave_attach/%s" (Global.get_host_local_dummydir ()) sr_uuid
 
 let fix_ctx context vdi =
 	Tracelog.add_to_c_other_info context "module" "vhdSlave";

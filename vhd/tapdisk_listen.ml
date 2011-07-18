@@ -6,7 +6,7 @@ module D=Debug.Debugger(struct let name="tapdisk_listen" end)
 open D
 
 let bind () =
-	let path = if !Global.dummy then (Printf.sprintf "%s/tapdisk_sock" !Global.dummydir) else "/var/sm/tapdisk_sock" in
+	let path = if !Global.dummy then (Printf.sprintf "%s/tapdisk_sock" !Global.dummydir) else "/var/run/vhdd/tapdisk_sock" in
 	Unixext.mkdir_safe (Filename.dirname path) 0o700;
 	Unixext.unlink_safe path;
 	let sockaddr = Unix.ADDR_UNIX(path) in
