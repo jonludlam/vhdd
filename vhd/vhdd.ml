@@ -8,16 +8,16 @@ open D
 module P = Process_xmlrpc.Processor(Vhdsm)
 
 let read_body req fd =
-	let len = match req.Http.content_length with Some x -> x | None -> failwith "Need a content length" in
+	let len = match req.Http.Request.content_length with Some x -> x | None -> failwith "Need a content length" in
 	Unixext.really_read_string fd (Int64.to_int len)
 
 let xmlrpc_handler req fd =
-	req.Http.close <- true;
-	let path = match String.split '/' req.Http.uri with
+	req.Http.Request.close <- true;
+	let path = match String.split '/' req.Http.Request.uri with
 		| x::ys -> List.hd (List.rev (x::ys))
 		| _ -> failwith "Unknown path"
 	in
-    let all = req.Http.cookie @ req.Http.query in
+    let all = req.Http.Request.cookie @ req.Http.Request.query in
 	let path = 
 		if List.mem_assoc "path" all then List.assoc "path" all else path in
 	debug "path=%s" path;
@@ -31,7 +31,7 @@ let xmlrpc_handler req fd =
 	let context = {
 		c_driver=path; 
 		c_api_call=call; 
-		c_task_id=(match req.Http.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); 
+		c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); 
 		c_other_info=[]; } in
 	Tracelog.append context (Tracelog.SmapiCall {Tracelog.path=path; body=(Xml.to_string xml); call=call}) None;
 	Debug.associate_thread_with_task context.c_task_id;
@@ -43,14 +43,14 @@ let xmlrpc_handler req fd =
 	Http_svr.response_str req fd str
 
 let internal_handler req fd =
-	req.Http.close <- true;
+	req.Http.Request.close <- true;
 	debug "Internal handler";
 	let body = read_body req fd in
 	let call = Int_rpc.intrpc_of_rpc (Jsonrpc.of_string body) in
 	debug "Call=%s" body;
 	(* Extract some info from the XML before we pass it to process *)
 (*	let call,args = XMLRPC.From.methodCall xml in*)
-	let context = {c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); c_other_info=[] } in
+	let context = {c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); c_other_info=[] } in
 	Debug.associate_thread_with_task context.c_task_id;
 	(*Tracelog.append context (Tracelog.InternalCall (body, call)) None;*)
 	let result = Int_server.process context call in

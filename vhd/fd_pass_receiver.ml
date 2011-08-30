@@ -28,14 +28,14 @@ let start path handler =
 
 		Unix.close fd_sock2;
 
-		ignore(Thread.create (fun () ->
+(*		ignore(Thread.create (fun () ->
 			Pervasiveext.finally (fun () ->
 				let s = String.sub buffer 0 len in
 				if len=0 then failwith "Connection closed";
 				Printf.printf "Received fd with message: %s\n%!" s;
-				let req = Http.request_of_rpc (Jsonrpc.of_string buffer) in
+				let req = Http.Request.t_of_rpc (Jsonrpc.of_string buffer) in
 				handler req newfd)
-				(fun () -> Unix.close newfd)) ());
+				(fun () -> Unix.close newfd)) ());*)
 
 		loop ()
 	in

@@ -46,24 +46,12 @@ let bytes_of_string field x =
   | _ -> raise (Vcli_failure (Printf.sprintf "Failed to parse field '%s': expecting an integer (possibly with suffix)" field))
 
 
-let get_headers host path content_length task_id =
-	[ 
-		Printf.sprintf "POST %s HTTP/1.0" path;
-		Printf.sprintf "User-Agent: vhdd/0.1";
-		Printf.sprintf "Host: %s" host;
-		"Content-Type: application/json";
-		Printf.sprintf "Content-length: %d" content_length;
-		Printf.sprintf "%s: %s" Http.task_id_hdr task_id]
+let rpc host port path xml = 
+  let open Xmlrpcclient in
+      XML_protocol.rpc ~transport:(TCP (host,port)) ~http:(xmlrpc ~version:"1.0" "path") xml
 
-let rpc host port path = Xmlrpcclient.do_xml_rpc ~version:"1.0" ~host ~port ~path
-
-let remote_rpc task_id host port call =
-	let str = Jsonrpc.to_string (Int_rpc.rpc_of_intrpc call) in
-	let path = "/internal" in
-	let headers = get_headers host path (String.length str) task_id in
-	let result = Xmlrpcclient.do_http_rpc host port headers str (fun content_length task_id fd -> Unixext.really_read_string fd content_length) in
-	Int_rpc.intrpc_response_wrapper_of_rpc (Jsonrpc.of_string result)
-
+let remote_rpc task_id host port =
+  Int_rpc.wrap_rpc (Vhdrpc.remote_rpc task_id host port)
 
 exception Missing_param of string
 

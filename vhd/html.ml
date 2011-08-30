@@ -202,7 +202,7 @@ let status context =
 	]] ()
 
 let dot_handler req fd =
-	req.Http.close <- true;
+	req.Http.Request.close <- true;
 	let context = {
 		c_driver="none";
 		c_api_call="none";
@@ -210,7 +210,7 @@ let dot_handler req fd =
 		c_other_info=[];
 	} in
 	let s = fd in
-	let path = String.split '/' req.Http.uri in
+	let path = String.split '/' req.Http.Request.uri in
 	match path with
 		| ""::"dot"::[sr_uuid] ->
 			let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
@@ -223,17 +223,17 @@ let dot_handler req fd =
 			failwith "Bad request"
 
 let wait_handler req fd =
-	req.Http.close <- true;
-	let path = String.split '/' req.Http.uri in
+	req.Http.Request.close <- true;
+	let path = String.split '/' req.Http.Request.uri in
 	match path with
 		| ""::"unwait"::[uuid] ->
 			(try Nmutex.unwait uuid with _ -> ());
-			Http_svr.response_redirect fd "/status"
+			Http_svr.response_str req ~hdrs:(Http.http_302_redirect "/status") fd ""
 		| _ -> failwith "Bad request"
 
 let status_handler req fd =
 	oddrow := true;
-	req.Http.close <- true;
+	req.Http.Request.close <- true;
 	let context = {
 		c_driver="none";
 		c_api_call="none";
@@ -262,8 +262,8 @@ let signal_slave_metadata_change metadata () =
 		Condition.broadcast metadata_change_condition)
 
 let update_handler req fd =
-	req.Http.close <- true;
-	let id = int_of_string (List.assoc "id" req.Http.query) in
+	req.Http.Request.close <- true;
+	let id = int_of_string (List.assoc "id" req.Http.Request.query) in
 	let get_updates () =
 		let all_master = List.filter_map (fun x -> x) 
 			(Attachments.map_master_srs (fun k v ->

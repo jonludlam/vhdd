@@ -23,7 +23,11 @@ let meg = Int64.mul 1024L 1024L
 let stddisksize = Int64.mul 50L meg
 let smallerdisksize = Int64.mul 40L meg
 
-let rpc host port path = Xmlrpcclient.do_xml_rpc ~version:"1.1" ~host ~port ~path ~subtask_of:""
+let rpc host port path ?task_id xml = 
+  let open Xmlrpcclient in
+      XML_protocol.rpc ~transport:(TCP (host,port)) ~http:(xmlrpc ~version:"1.0" path ?task_id) xml
+
+
 let intrpc host port = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc "dummy" host port)
 
 let dummy_context = {
@@ -47,7 +51,7 @@ type state = {
 	vdis : vdi list;
 }
 
-let vhdd_path = ref "/myrepos/vhdd.hg/vhd/vhdd"
+let vhdd_path = ref "../vhd/vhdd"
 
 let pool = ref false
 

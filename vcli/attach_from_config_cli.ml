@@ -1,4 +1,6 @@
-let rpc path xml = Xmlrpcclient.do_xml_rpc ~version:"1.0" ~host:"localhost" ~port:4094 ~path xml
+let rpc path xml = 
+  let open Xmlrpcclient in
+      XML_protocol.rpc ~transport:(TCP ("localhost",4094)) ~http:(xmlrpc ~version:"1.0" path) xml
 
 let _ =
 	let cmdname = Sys.argv.(0) in

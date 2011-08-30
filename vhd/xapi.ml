@@ -7,7 +7,10 @@ open Vhd_records
 module D=Debug.Debugger(struct let name="xapi" end)
 open D
 
-let xapirpc xml = Xmlrpcclient.do_xml_rpc_unix ~version:"1.0" ~filename:"/var/xapi/xapi" ~path:"/" xml
+let xapirpc xml = 
+  let open Xmlrpcclient in 
+      let xmlrpc = xmlrpc ~version:"1.0" ~keep_alive:false "/" in
+      XML_protocol.rpc (Unix "/var/xapi/xapi") xmlrpc xml
 
 let create_vdi generic_params id virtual_size phys_size =
 	let uuid = Uuid.to_string (Uuid.make_uuid ()) in

@@ -129,6 +129,6 @@ let init () =
 	Nmutex.cond_wait_post_hook := cond_wait_post_hook
 
 let tracelog_handler req fd =
-	req.Http.close <- true;
+	req.Http.Request.close <- true;
 	let str = get_txt () in
 	Http_svr.response_str req fd str
