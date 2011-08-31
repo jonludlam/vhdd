@@ -51,7 +51,7 @@ type state = {
 	vdis : vdi list;
 }
 
-let vhdd_path = ref "../vhd/vhdd"
+let vhdd_path = ref "vhdd"
 
 let pool = ref false
 
@@ -1612,6 +1612,7 @@ let _ =
 		"-d", Arg.Set_string device, "Device to use (real mode only)";
 		"-h", Arg.Set_string hosts, "Set the hosts list (comma separated list, first is master, defaults to 'localhost')";
 		"-t", Arg.String (fun name' -> name := Some name'), "Sets the name of the test to run";
+		"-path", Arg.Set_string vhdd_path, "Path to vhdd binary";
 		"-list", Arg.Set list_mode, "Just list the tests";
 		"-target", Arg.Set_string target, "Set the ISCSI target";
 		"-targetiqn", Arg.Set_string targetiqn, "Set the ISCSI target IQN";
