@@ -9,7 +9,7 @@ OCAMLDESTDIR ?= $(OCAMLLIBDIR)
 
 OCAMLC = ocamlfind ocamlc -g
 OCAMLOPT = ocamlfind ocamlopt -g
-OCAMLPACKS = str,xapi-client,xmlm,xml-light2,stdext,uuid,camldm,lvm,rpc-light.syntax,rpc-light.json,netdev,threads,vhd,tapctl
+OCAMLPACKS = str,xapi-client,xmlm,xml-light2,stdext,uuid,camldm,lvm,rpc-light.syntax,rpc-light.json,netdev,threads,vhd,tapctl,http-svr
 COMPFLAG = -thread -package $(OCAMLPACKS) -syntax camlp4o -I ../smapi -dtypes
 LINKFLAG = -linkpkg ../smapi/smapi.cmxa
 SOURCES = \

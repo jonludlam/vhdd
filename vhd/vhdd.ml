@@ -7,6 +7,8 @@ open D
 
 module P = Process_xmlrpc.Processor(Vhdsm)
 
+let server = Http_svr.Server.empty 
+
 let read_body req fd =
 	let len = match req.Http.Request.content_length with Some x -> x | None -> failwith "Need a content length" in
 	Unixext.really_read_string fd (Int64.to_int len)
@@ -64,10 +66,10 @@ let register name =
 		let unix_socket_path = Smapi.unix_socket_path name in
 		Unixext.mkdir_safe (Filename.dirname unix_socket_path) 0o700;
 		Unixext.unlink_safe unix_socket_path;
-		let domain_sock = Http_svr.bind (Unix.ADDR_UNIX(unix_socket_path)) in
-		ignore(Http_svr.start (domain_sock, "unix-RPC"));
+		let domain_sock = Http_svr.bind (Unix.ADDR_UNIX(unix_socket_path)) "unix-rpc" in
+		Http_svr.start server domain_sock
 	end;
-	Http_svr.add_handler Http.Post (Printf.sprintf "/%s" name) (Http_svr.FdIO xmlrpc_handler)
+	Http_svr.Server.add_handler server Http.Post (Printf.sprintf "/%s" name) (Http_svr.FdIO xmlrpc_handler)
 
 let server_init () =
 	Logs.reset_all [ "file:/var/log/vhdd.log" ];
@@ -85,16 +87,16 @@ let server_init () =
 	   and slaves. Happily, We only require internal API for this
 	   though, so we delay the startup of the SMAPI handlers until we're
 	   fully bootstrapped. *)
-	Http_svr.add_handler Http.Get "/status" (Http_svr.FdIO Html.status_handler);
-	Http_svr.add_handler Http.Get "/tracelog" (Http_svr.FdIO Tracelog.tracelog_handler);
-	Http_svr.add_handler Http.Post "/unwait" (Http_svr.FdIO Html.wait_handler);
-	Http_svr.add_handler Http.Get "/dot" (Http_svr.FdIO Html.dot_handler);
-	Http_svr.add_handler Http.Get "/updates" (Http_svr.FdIO Html.update_handler);
-	Http_svr.add_handler Http.Post "/internal" (Http_svr.FdIO internal_handler);
-	Http_svr.add_handler Http.Post "/global" (Http_svr.FdIO internal_handler);
+	Http_svr.Server.add_handler server Http.Get "/status" (Http_svr.FdIO Html.status_handler);
+	Http_svr.Server.add_handler server Http.Get "/tracelog" (Http_svr.FdIO Tracelog.tracelog_handler);
+	Http_svr.Server.add_handler server Http.Post "/unwait" (Http_svr.FdIO Html.wait_handler);
+	Http_svr.Server.add_handler server Http.Get "/dot" (Http_svr.FdIO Html.dot_handler);
+	Http_svr.Server.add_handler server Http.Get "/updates" (Http_svr.FdIO Html.update_handler);
+	Http_svr.Server.add_handler server Http.Post "/internal" (Http_svr.FdIO internal_handler);
+	Http_svr.Server.add_handler server Http.Post "/global" (Http_svr.FdIO internal_handler);
 
 	if !Global.enable_fileserver then
-		Http_svr.add_handler Http.Get "/" (Http_svr.BufIO (Fileserver.send_file "/" !Global.fileserver_base));
+		Http_svr.Server.add_handler server Http.Get "/" (Http_svr.BufIO (Fileserver.send_file "/" !Global.fileserver_base));
 
 	ignore(Thread.create (fun () -> Fd_pass_receiver.start "/debug" xmlrpc_handler) ());
 	ignore(Thread.create (fun () -> Fd_pass_receiver.start "/internal" internal_handler) ());
@@ -104,9 +106,8 @@ let server_init () =
 	ignore(Thread.create (fun () -> Fd_pass_receiver.start "/updates" Html.update_handler) ());
 
 	(*let localhost = Unix.inet_addr_of_string "127.0.0.1" in*)
-	let localhost_sock = Http_svr.bind (Unix.ADDR_INET(Unix.inet_addr_any, !Global.port)) in
-	Unix.setsockopt localhost_sock Unix.SO_REUSEADDR true;
-	ignore(Http_svr.start (localhost_sock, "inet-RPC"));
+	let localhost_sock = Http_svr.bind (Unix.ADDR_INET(Unix.inet_addr_any, !Global.port)) "inet-rpc" in
+	Http_svr.start server localhost_sock;
 
 	(* Reattach using the /var/run/vhdd/attachments.xml file *)
 
