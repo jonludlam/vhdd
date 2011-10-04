@@ -4,7 +4,7 @@ open Stringext
 
 module SC=Smapi_client
 
-let rpc host port path = Xmlrpcclient.do_xml_rpc ~version:"1.0" ~host ~port ~path
+let rpc host port path = Xmlrpc_client.do_xml_rpc ~version:"1.0" ~host ~port ~path
 let intrpc host port = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc "dummy" host port)
 
 let meg = Int64.mul 1024L 1024L
@@ -84,7 +84,7 @@ let _ =
   
   let all = master_and_rpc :: slaves_and_rpcs in
 
-  let testrpc task_id = Xmlrpcclient.do_xml_rpc ~task_id ~subtask_of:"" ~version:"1.0" ~host:"localhost" ~port:4094 ~path:"/lvmtest" in
+  let testrpc task_id = Xmlrpc_client.do_xml_rpc ~task_id ~subtask_of:"" ~version:"1.0" ~host:"localhost" ~port:4094 ~path:"/lvmtest" in
 
   let tests = [
     "coalesce", (fun () -> Coalescetest.coalesce_test all sr);

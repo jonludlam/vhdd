@@ -168,7 +168,7 @@ module Processor =
 				process xml
 
 			let remote_rpc host port path xml =
-			  let open Xmlrpcclient in
+			  let open Xmlrpc_client in
 			      XML_protocol.rpc ~transport:(TCP (host,port)) ~http:(xmlrpc ~version:"1.0" path) xml
 
 		end

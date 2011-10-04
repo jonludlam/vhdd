@@ -1,5 +1,5 @@
 let rpc path xml = 
-  let open Xmlrpcclient in
+  let open Xmlrpc_client in
       XML_protocol.rpc ~transport:(TCP ("localhost",4094)) ~http:(xmlrpc ~version:"1.0" path) xml
 
 let _ =

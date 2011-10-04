@@ -24,7 +24,7 @@ let stddisksize = Int64.mul 50L meg
 let smallerdisksize = Int64.mul 40L meg
 
 let rpc host port path ?task_id xml = 
-  let open Xmlrpcclient in
+  let open Xmlrpc_client in
       XML_protocol.rpc ~transport:(TCP (host,port)) ~http:(xmlrpc ~version:"1.0" path ?task_id) xml
 
 

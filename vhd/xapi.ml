@@ -8,7 +8,7 @@ module D=Debug.Debugger(struct let name="xapi" end)
 open D
 
 let xapirpc xml = 
-  let open Xmlrpcclient in 
+  let open Xmlrpc_client in 
       let xmlrpc = xmlrpc ~version:"1.0" ~keep_alive:false "/" in
       XML_protocol.rpc (Unix "/var/xapi/xapi") xmlrpc xml
 
