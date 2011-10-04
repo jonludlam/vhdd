@@ -7,7 +7,7 @@ open D
 
 module P = Process_xmlrpc.Processor(Vhdsm)
 
-let server = Http_svr.Server.empty 
+let server = Http_svr.Server.empty ()
 
 let read_body req fd =
 	let len = match req.Http.Request.content_length with Some x -> x | None -> failwith "Need a content length" in
