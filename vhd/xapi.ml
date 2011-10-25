@@ -21,10 +21,8 @@ let create_vdi generic_params id virtual_size phys_size =
 			let vdi_ref = Client.VDI.db_introduce
 				~rpc:xapirpc ~session_id:session ~uuid:uuid ~name_label:uuid ~name_description:"Cloned by backend"
 				~sR:sr_ref ~_type:`user ~sharable:false ~read_only:false ~other_config:[] ~location:id
-				~xenstore_data:[] ~sm_config:[] in
-			Client.VDI.set_managed ~rpc:xapirpc ~session_id:session ~self:vdi_ref ~value:true;
-			Client.VDI.set_virtual_size ~rpc:xapirpc ~session_id:session ~self:vdi_ref ~value:virtual_size;
-			Client.VDI.set_physical_utilisation ~rpc:xapirpc ~session_id:session ~self:vdi_ref ~value:phys_size
+				~xenstore_data:[] ~sm_config:[] ~managed:true ~virtual_size:virtual_size ~physical_utilisation:phys_size ~metadata_of_pool:Ref.null ~is_a_snapshot:false ~snapshot_time:Date.never ~snapshot_of:Ref.null in
+				()
 		| None -> ());
 	uuid
 
