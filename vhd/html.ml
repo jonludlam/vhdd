@@ -218,7 +218,7 @@ let dot_handler req fd =
 			let tmp = Filenameext.temp_file_in_dir "/tmp/foo" in
 			Unixext.write_string_to_file tmp dot;
 			let stdout,stderr = Forkhelpers.execute_command_get_output "/usr/bin/dot" ["-Tpng";tmp] in
-			Http_svr.response_str req ~hdrs:((Http.http_200_ok_with_content (Int64.of_int (String.length stdout)) ~version:"1.0" ~keep_alive:false ()) @ ["Content-Type","image/png"]) s stdout
+			Http_svr.response_str ?hdrs:(Some ["Content-Type","image/png"]) req s stdout
 		| _ ->
 			failwith "Bad request"
 
@@ -228,7 +228,7 @@ let wait_handler req fd =
 	match path with
 		| ""::"unwait"::[uuid] ->
 			(try Nmutex.unwait uuid with _ -> ());
-			Http_svr.response_str req ~hdrs:(Http.http_302_redirect "/status") fd ""
+			Http_svr.response_str req fd "OK"
 		| _ -> failwith "Bad request"
 
 let status_handler req fd =
