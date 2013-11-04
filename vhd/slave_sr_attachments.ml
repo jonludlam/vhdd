@@ -2,7 +2,7 @@
 open Vhd_types
 open Int_types
 
-module D=Debug.Debugger(struct let name="slave_sr_attachments" end)
+module D=Debug.Make(struct let name="slave_sr_attachments" end)
 open D
 
 (* Store the attached hosts with resync_required=true (if we need to read this, resync will be required!) *)

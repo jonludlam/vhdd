@@ -1,9 +1,8 @@
 open Vhd_types
 open Int_types
-open Smapi_types
 open Int_rpc
 
-module D=Debug.Debugger(struct let name="int_client_utils" end)
+module D=Debug.Make(struct let name="int_client_utils" end)
 open D
 
 let rec slave_retry_loop context allowed_errors (f : (intrpc -> intrpc_response_wrapper) -> 'a) metadata : 'a =

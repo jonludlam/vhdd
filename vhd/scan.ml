@@ -2,7 +2,7 @@ open Listext
 open Vhd_types
 open Vhd_records
 
-module D=Debug.Debugger(struct let name="scan" end)
+module D=Debug.Make(struct let name="scan" end)
 open D
 
 let scan context container =

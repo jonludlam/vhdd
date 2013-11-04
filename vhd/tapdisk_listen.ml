@@ -2,7 +2,7 @@
 
 open Stringext
 
-module D=Debug.Debugger(struct let name="tapdisk_listen" end)
+module D=Debug.Make(struct let name="tapdisk_listen" end)
 open D
 
 let bind () =
@@ -46,7 +46,7 @@ let handle_connection sockaddr fd =
 								let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
 								let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
 								let with_footer = Int64.add end_of_chunk_including_bitmap 512L in
-								Int_client.Vdi.slave_set_phys_size (Int_rpc.wrap_rpc ((!Vhdrpc.local_rpc) (Uuid.to_string (Uuid.make_uuid ())))) sr_uuid id with_footer;
+								Int_client.Vdi.slave_set_phys_size (Int_rpc.wrap_rpc ((!Vhdrpc.local_rpc) (Uuidm.to_string (Uuidm.create Uuidm.(`V4))))) sr_uuid id with_footer;
 								debug "Done";
 							| _ -> debug "Couldn't parse tapdisk device: %s" basename
 					end

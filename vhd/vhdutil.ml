@@ -3,7 +3,7 @@
 open Stringext
 open Int64
 
-module D = Debug.Debugger(struct let name="vhdutil" end)
+module D = Debug.Make(struct let name="vhdutil" end)
 open D
 
 (* Some utility definitions *)
@@ -36,7 +36,7 @@ and reservation_mode =
 	| Attach
 	with rpc
 
-let zero_uuid = Uuid.string_of_uuid (Uuid.uuid_of_int_array (Array.make 16 0))
+let zero_uuid = Uuidm.to_string Uuidm.nil
 
 (* Utility *)
 let roundup v block =

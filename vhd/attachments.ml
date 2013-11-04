@@ -1,10 +1,9 @@
 open Vhd_types
 open Threadext
-open Smapi_types
 open Stringext
 open Int_types
 
-module D=Debug.Debugger(struct let name="attachments" end)
+module D=Debug.Make(struct let name="attachments" end)
 open D
 
 let get_log_file () = Printf.sprintf "%s/var/run/vhdd/attachments.json" (Global.get_host_local_dummydir ())

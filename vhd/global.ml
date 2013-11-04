@@ -15,7 +15,7 @@ let host_uuid = ref None
 let get_host_uuid () =
 	match !host_uuid with
 		| None ->
-			let id = Xapi_inventory.lookup Xapi_inventory._installation_uuid in
+			let id = Inventory.lookup Inventory._installation_uuid in
 			host_uuid := Some id;
 			id
 		| Some id -> id
@@ -24,7 +24,7 @@ let mgt_iface = ref None
 let get_mgt_iface () =
 	match !mgt_iface with
 		| None ->
-			let iface = Xapi_inventory.lookup Xapi_inventory._management_interface in
+			let iface = Inventory.lookup Inventory._management_interface in
 			mgt_iface := Some iface;
 			iface
 		| Some iface -> iface

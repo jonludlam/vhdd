@@ -4,7 +4,7 @@ open Int_rpc
 open Int_types
 open Threadext
 
-module D=Debug.Debugger(struct let name="int_server" end)
+module D=Debug.Make(struct let name="int_server" end)
 open D
 
 let process ctx call =

@@ -1,7 +1,6 @@
 open Vhd_types
-open Smapi_types
 
-module D=Debug.Debugger(struct let name="driver" end)
+module D=Debug.Make(struct let name="driver" end)
 open D
 
 type lvm_type =
@@ -33,6 +32,8 @@ let hba = "HBA"
 let local = "local"
 
 (* Parameters *)
+
+type sm_config_param = { key : string; description : string }
 
 let device = "device" (* ext and lvm *)
 let device_p = {key=device; description="The block device on which the SR resides."}
@@ -106,4 +107,4 @@ let string_of driver =
 	driver_name
 
 let of_ctx ctx =
-	of_string ctx.c_driver
+	of_string ctx.Context.c_driver

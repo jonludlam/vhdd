@@ -1,11 +1,10 @@
 open Vhd_types
-open Smapi_types
 open Threadext
 open Int_types
 open Master_utils
 open Vhd_records
 
-module D=Debug.Debugger(struct let name="clone" end)
+module D=Debug.Make(struct let name="clone" end)
 open D
 
 let syslog s =
@@ -52,7 +51,7 @@ let clone context metadata generic_params vdi new_reservation_override =
 
 			debug "Creating new leaf for new VDI";
 			let (vhd2,lvsize2) = create_child context metadata new_reservation_override virtual_size parent_location parent_ptr false in 
-			let new_id2 = Uuid.to_string (Uuid.make_uuid ()) in
+			let new_id2 = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 
 			let (new_vsize,hidden) =
 				match parent_ptr with

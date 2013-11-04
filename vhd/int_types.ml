@@ -1,4 +1,3 @@
-open Smapi_types
 open Camldm
 
 exception IntError of (string * (string list))
@@ -39,7 +38,7 @@ with rpc
 
 (** Context, used for information only *)
 type lcontext = {
-	lc_context : context;
+	lc_context : Context.t;
 	mutable lc_blocked : bool;
 	lc_reason : string;
 	lc_lock_required : string;

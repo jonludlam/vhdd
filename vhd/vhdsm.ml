@@ -5,7 +5,7 @@ open Int_types
 open Threadext
 open Stringext
 
-module D = Debug.Debugger(struct let name="vhdsm" end)
+module D = Debug.Make(struct let name="vhdsm" end)
 open D
 
 module SR = struct
@@ -227,7 +227,7 @@ module SR = struct
 			attach_in_mode ctx generic_params path sr mode false)
 
 	let reattach sr =
-		let ctx =  {c_driver=sr.Attachments.drivertype; c_api_call="sr_attach"; c_task_id=Uuid.to_string (Uuid.make_uuid ()); c_other_info=[]} in
+		let ctx =  {c_driver=sr.Attachments.drivertype; c_api_call="sr_attach"; c_task_id=Uuidm.to_string (Uuidm.create Uuidm.(`V4)); c_other_info=[]} in
 		let driver = Drivers.of_string sr.Attachments.drivertype in
 		let device_config = sr.Attachments.device_config in
 		let path = sr.Attachments.path in

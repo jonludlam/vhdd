@@ -1,13 +1,12 @@
 (* Slave! *)
 open Vhd_types
-open Smapi_types
 open Threadext
 open Stringext
 open Drivers
 open Int_types
 open Listext
 
-module D = Debug.Debugger(struct let name="vhdSlave" end)
+module D = Debug.Make(struct let name="vhdSlave" end)
 open D
 
 let get_slave_attach_dir sr_uuid =

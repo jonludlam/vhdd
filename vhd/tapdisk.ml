@@ -2,7 +2,7 @@ open Stringext
 open Listext
 open Threadext
 
-module D=Debug.Debugger(struct let name="tapdisk" end)
+module D=Debug.Make(struct let name="tapdisk" end)
 open D
 
 let dummy_vhd = "/var/run/vhdd/dummy.vhd"

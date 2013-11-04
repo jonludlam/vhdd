@@ -1,9 +1,9 @@
 open Int_types
 open Vhd_types
-open Smapi_types
 open Threadext
 open Vhd_records
-module D=Debug.Debugger(struct let name="tracelog" end)
+open Context
+module D=Debug.Make(struct let name="tracelog" end)
 open D
 
 type smapicall_ty = { path : string; body: string; call: string }

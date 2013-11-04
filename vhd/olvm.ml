@@ -452,7 +452,7 @@ let resize_lv vg lv_name size =
 	{vg with lvs = (lv_name,(segs,tags))::(List.remove_assoc lv_name vg.lvs)}
 
 let get_vg_name_from_device device =
-	let probe_uuid = Uuid.to_string (Uuid.make_uuid ()) in
+	let probe_uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 	write_lvm_conf true probe_uuid [device];
 	let env = getenv probe_uuid in
 	let out = execute_command_get_output env pvs ["--separator";",";"--noheadings"] in

@@ -8,7 +8,7 @@ open Int_types
 open Listext
 open Vhd_records
 
-module D=Debug.Debugger(struct let name="coalesce" end)
+module D=Debug.Make(struct let name="coalesce" end)
 open D
 
 

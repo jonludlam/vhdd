@@ -10,7 +10,7 @@ open Listext
 open Coalesce
 open Vhd_records
 
-module D=Debug.Debugger(struct let name="vhdmaster" end)
+module D=Debug.Make(struct let name="vhdmaster" end)
 open D
 
 exception Other_master_detected of host
@@ -77,7 +77,7 @@ module VDI = struct
 
 	let create context metadata generic_params sm_config virtual_size =
 		fix_ctx context None;
-		let location_uuid = Uuid.to_string (Uuid.make_uuid ()) in
+		let location_uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 
 		let raw =
 			if List.mem_assoc "type" sm_config
@@ -85,7 +85,7 @@ module VDI = struct
 			else false
 		in
 
-		let id = Uuid.to_string (Uuid.make_uuid ()) in
+		let id = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 
 		let (ptr,vsize,lvsize) =
 			if raw
@@ -639,7 +639,7 @@ end
 		  Hashtbl.iter (fun vhduid vhdr ->
 		  if vhdr.is_leaf then begin
 		  if List.exists (fun (vdi,vdir) -> vdir.API.vDI_location = vhdr.vhduid) sr_vdis then () else
-		  let uuid = Uuid.to_string (Uuid.make_uuid ()) in
+		  let uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 		  ignore(Client.VDI.db_introduce
 		  ~rpc:xapirpc ~session_id:session ~uuid:uuid ~name_label:uuid ~name_description:"Found by scan"
 		  ~sR:sr ~_type:`user ~sharable:false ~read_only:(not vhdr.is_leaf) ~other_config:[] ~location:vhdr.vhduid

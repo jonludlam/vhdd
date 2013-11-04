@@ -1,6 +1,5 @@
-open Smapi_types
 
-module D=Debug.Debugger(struct let name="fd_pass_receiver" end)
+module D=Debug.Make(struct let name="fd_pass_receiver" end)
 open D
 
 let get_dir_path () = Printf.sprintf "%s/var/xapi/fd_servers/vhdd" (Global.get_host_local_dummydir ())

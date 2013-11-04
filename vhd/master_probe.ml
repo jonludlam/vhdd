@@ -1,9 +1,10 @@
 (* Try to detect the SR master from the attached_hosts location *)
 open Stringext
-open Smapi_types
 open Int_types
+open Context
+open Vhd_types
 
-module Debug=Debug.Debugger(struct let name="master_probe" end)
+module D=Debug.Make(struct let name="master_probe" end)
 open D
 
 exception CorruptHostAttachments

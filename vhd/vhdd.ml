@@ -2,7 +2,7 @@
 open Smapi_types
 open Stringext
 
-module D=Debug.Debugger(struct let name="vhdd" end)
+module D=Debug.Make(struct let name="vhdd" end)
 open D
 
 module P = Process_xmlrpc.Processor(Vhdsm)
@@ -33,7 +33,7 @@ let xmlrpc_handler req fd =
 	let context = {
 		c_driver=path; 
 		c_api_call=call; 
-		c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); 
+		c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); 
 		c_other_info=[]; } in
 	Tracelog.append context (Tracelog.SmapiCall {Tracelog.path=path; body=(Xml.to_string xml); call=call}) None;
 	Debug.associate_thread_with_task context.c_task_id;
@@ -52,7 +52,7 @@ let internal_handler req fd =
 	debug "Call=%s" body;
 	(* Extract some info from the XML before we pass it to process *)
 (*	let call,args = XMLRPC.From.methodCall xml in*)
-	let context = {c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); c_other_info=[] } in
+	let context = {c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); c_other_info=[] } in
 	Debug.associate_thread_with_task context.c_task_id;
 	(*Tracelog.append context (Tracelog.InternalCall (body, call)) None;*)
 	let result = Int_server.process context call in
@@ -123,8 +123,8 @@ let server_init () =
 		Thread.delay 20000.;
 	done
 
-module MLVMDebug=Debug.Debugger(struct let name="mlvm" end)
-module W=Debug.Debugger(struct let name="watchdog" end)
+module MLVMDebug=Debug.Make(struct let name="mlvm" end)
+module W=Debug.Make(struct let name="watchdog" end)
 
 let delay_on_eintr f =
   try

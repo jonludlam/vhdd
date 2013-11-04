@@ -1,6 +1,6 @@
 open Threadext
 
-module D=Debug.Debugger (struct let name="vhd_records" end) 
+module D=Debug.Make (struct let name="vhd_records" end) 
 open D
 
 type pointer =
@@ -354,7 +354,7 @@ module Tests = struct
 	open Ocamltest
 
 	let ctx = {
-		Smapi_types.c_driver = "none";
+		Context.c_driver = "none";
 		c_api_call = "none";
 		c_task_id = "none";
 		c_other_info = [];

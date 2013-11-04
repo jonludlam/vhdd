@@ -9,10 +9,10 @@ OCAMLDESTDIR ?= $(OCAMLLIBDIR)
 
 OCAMLC = ocamlfind ocamlc -g
 OCAMLOPT = ocamlfind ocamlopt -g
-OCAMLPACKS = xcp,str,uuidm,camldm,lvm,rpclib.syntax,rpclib.json,netdev,threads,vhdlib,tapctl,http-svr,xcp.storage
-COMPFLAG = -thread -package $(OCAMLPACKS) -syntax camlp4o -I ../smapi -dtypes
-LINKFLAG = -linkpkg ../smapi/smapi.cmxa
+OCAMLPACKS = xcp,xcp-inventory,str,uuidm,camldm,lvm,rpclib.syntax,rpclib.json,netdev,threads,vhdlib,tapctl,http-svr,xcp.storage
+COMPFLAG = -thread -package $(OCAMLPACKS) -syntax camlp4o -dtypes
 SOURCES = \
+	context \
 	ocamltest \
 	circ \
 	olvm \
@@ -22,7 +22,6 @@ SOURCES = \
 	host \
 	fsutils \
 	lvmabs_types \
-	xapi_inventory \
 	global \
 	vhdutil \
 	tapdisk \
@@ -46,7 +45,6 @@ SOURCES = \
 	html \
 	slave_sr_attachments \
 	locking \
-	xapi \
 	int_client_utils \
 	tapdisk_listen \
 	id_map \
@@ -91,6 +89,6 @@ clean:
 	rm -f *.cmi *.cmx *.cmo *.a *.cma *.cmxa *.run *.opt *.annot *.o
 
 deps:
-	ocamlfind ocamldep -package str,xapi-client,xmlm,xml-light2,stdext,uuid,camldm,lvm,rpc-light.syntax,rpc-light.json,netdev,threads,vhd -syntax camlp4o -I ../smapi  *.ml *.mli > deps
+	ocamlfind ocamldep -package str,xen-api-client,xmlm,xml-light2,stdext,uuid,camldm,lvm,rpclib.syntax,rpclib.json,netdev,threads,vhdlib -syntax camlp4o  *.ml *.mli > deps
 
 include deps

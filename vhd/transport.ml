@@ -1,11 +1,11 @@
 open Drivers
 open Stringext
-open Smapi_types
 open Listext
+open Vhd_types
 
 exception MissingParam of string
 
-module D=Debug.Debugger(struct let name="transport" end)
+module D=Debug.Make(struct let name="transport" end)
 open D
 
 let safe_assoc name params =
@@ -18,6 +18,8 @@ let is_mounted dir =
 		stroot.Unix.st_dev <> stdir.Unix.st_dev
 	with _ ->
 		false
+
+let mount_path sr_uuid = Printf.sprintf "/var/run/sr-mount/%s" sr_uuid
 
 let localext_vg_stem = "XSLocalEXT-"
 
@@ -42,17 +44,21 @@ let attach ty sr_uuid gp is_create =
 						| Some l -> [(Drivers.localiqn,l)]
 						| _ -> []) @ device_config } in
 			let sr = (Some {sr_uuid=sr_uuid}) in
-			let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.iscsi) gp sr in
+(*			let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.iscsi) gp sr in
 			let scsiid = safe_assoc (Drivers.scsiid) device_config in
 			let path = Smapi_client.VDI.attach (Smapi_client.execrpc Drivers.iscsi) gp sr scsiid true in
 			path
+*)
+			failwith "Not implemented"
+
 		| OldLvm Fc
 		| Lvm Fc ->
 			let sr = (Some {sr_uuid=sr_uuid}) in
-			let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.hba) gp sr in
+			(*let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.hba) gp sr in
 			let scsiid = safe_assoc Drivers.scsiid device_config in
 			let path = Smapi_client.VDI.attach (Smapi_client.execrpc Drivers.hba) gp sr scsiid true in
-			path
+			path*)
+			failwith "Not implemented"
                 | File FLocal ->
                         let path = safe_assoc Drivers.localpath device_config in
                         let _ = Unix.stat path in
@@ -61,7 +67,7 @@ let attach ty sr_uuid gp is_create =
                     		Unix.mkdir sr_path 0o777
                         end;
                         let _ = Unix.stat sr_path in
-			let sr_path_real = Smapi.mount_path sr_uuid in
+			let sr_path_real = mount_path sr_uuid in
 			debug "About to unlink %s" sr_path_real;
 			Unixext.unlink_safe sr_path_real;
 			let localpath = "/var/run/sr-mount" in
@@ -122,7 +128,7 @@ let attach ty sr_uuid gp is_create =
 					debug "mkfs.ext3 returned: %s" out;
 				end;
 
-				let path = Smapi.mount_path sr_uuid in
+				let path = mount_path sr_uuid in
 				debug "About to make directory: %s" path;
 				Unixext.mkdir_rec path 0700;
 
@@ -152,25 +158,27 @@ let detach ty sr_uuid gp =
 						| _ -> []) @ device_config } in
 			let sr = (Some {sr_uuid=sr_uuid}) in
 			let scsiid = safe_assoc Drivers.scsiid device_config in
-			let _ = Smapi_client.VDI.detach (Smapi_client.execrpc Drivers.iscsi) gp sr scsiid in
-			Smapi_client.SR.detach (Smapi_client.execrpc Drivers.iscsi) gp sr
+(*			let _ = Smapi_client.VDI.detach (Smapi_client.execrpc Drivers.iscsi) gp sr scsiid in
+			Smapi_client.SR.detach (Smapi_client.execrpc Drivers.iscsi) gp sr*)
+			failwith "Unimplemented"
 		| Lvm Fc
 		| OldLvm Fc ->
 			let sr = (Some {sr_uuid=sr_uuid}) in
 			let scsiid = safe_assoc Drivers.scsiid device_config in
-			let _ = Smapi_client.VDI.detach (Smapi_client.execrpc Drivers.hba) gp sr scsiid in
-			Smapi_client.SR.detach (Smapi_client.execrpc Drivers.hba) gp sr
+(*			let _ = Smapi_client.VDI.detach (Smapi_client.execrpc Drivers.hba) gp sr scsiid in
+			Smapi_client.SR.detach (Smapi_client.execrpc Drivers.hba) gp sr*)
+			failwith "Unimplemented"
 		| File FLocal -> 
-		  let sr_mount_path = (Smapi.mount_path sr_uuid) in
+		  let sr_mount_path = mount_path sr_uuid in
 		  debug "About to unlink %s" sr_mount_path;
 		  (try Unixext.unlink_safe sr_mount_path with _ -> ())
 		| File Nfs ->
-			let localpath = Smapi.mount_path sr_uuid in
+			let localpath = mount_path sr_uuid in
 			if is_mounted localpath then
 				Nfs.unmount localpath
 
 		| File Ext ->
-			let localpath = Smapi.mount_path sr_uuid in
+			let localpath =mount_path sr_uuid in
 
 			if is_mounted localpath then
 				ignore(Forkhelpers.execute_command_get_output "/bin/umount" [localpath]);
@@ -212,13 +220,13 @@ let probe ty gp continuation =
 					| (Some target, Some targetiqn, Some scsiid) ->
 						(* We have everything required to attach the transport layer -
 						   so do so and then call the continuation *)
-						let tmp_sr_uuid = (Uuid.to_string (Uuid.make_uuid ())) in
+						let tmp_sr_uuid = (Uuidm.to_string (Uuidm.create Uuidm.(`V4))) in
 						let path = attach ty tmp_sr_uuid gp false in
 						let result = continuation path in
 						detach ty tmp_sr_uuid gp;
 						result
 					| (Some target, Some targetiqn, _) ->
-						let tmp_sr_uuid = (Uuid.to_string (Uuid.make_uuid ())) in
+						let tmp_sr_uuid = (Uuidm.to_string (Uuidm.create Uuidm.(`V4))) in
 						let localiqn = Iscsilib.get_current_initiator_name () in
 						let gp = { gp with
 							gp_device_config=
@@ -226,14 +234,15 @@ let probe ty gp continuation =
 									| Some l -> [(Drivers.localiqn,l)]
 									| _ -> []) @ device_config } in
 						let sr = (Some {sr_uuid=tmp_sr_uuid}) in
-						let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.iscsi) gp sr in
+(*						let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.iscsi) gp sr in
 						let vdis = Pervasiveext.finally
 							(fun () ->
 								Smapi_client.SR.scan (Smapi_client.execrpc Drivers.iscsi) gp sr)
 							(fun () ->
 								Smapi_client.SR.detach (Smapi_client.execrpc Drivers.iscsi) gp sr)
-						in
-						debug "Got result from ISCSISR: %s" vdis;
+						in*)
+						failwith "Unimplemented";
+(*						debug "Got result from ISCSISR: %s" vdis;
 						let xml = Xml.parse_string vdis in
 						let vdis = match xml with
 							| Xml.Element("sr",_,children) ->
@@ -254,9 +263,9 @@ let probe ty gp continuation =
 							Xml.Element("LUN",[],
 							[Xml.Element("SCSIid",[],[Xml.PCData scsiid]);
 							Xml.Element("size",[],[Xml.PCData size]);
-							Xml.Element("LUNid",[],[Xml.PCData lun])])) vdis)
+							Xml.Element("LUNid",[],[Xml.PCData lun])])) vdis)*)
 					| _ ->
-						let localiqn = Iscsilib.get_current_initiator_name () in
+(*						let localiqn = Iscsilib.get_current_initiator_name () in
 						let gp = { gp with
 							gp_device_config=
 								(match localiqn with
@@ -265,7 +274,8 @@ let probe ty gp continuation =
 						let test =
 							Smapi_client.SR.probe (Smapi_client.execrpc_get_stderr Drivers.iscsi) gp []
 						in
-						Xml.parse_string test
+						Xml.parse_string test*)
+					  failwith "Unimplemented"
 			end
 		| Lvm Fc
 		| OldLvm Fc ->
@@ -277,17 +287,18 @@ let probe ty gp continuation =
 						| (Some scsiid) -> begin
 							(* We have everything required to attach the transport layer -
 							   so do so and then call the continuation *)
-							let tmp_sr_uuid = (Uuid.to_string (Uuid.make_uuid ())) in
+							let tmp_sr_uuid = (Uuidm.to_string (Uuidm.create Uuidm.(`V4))) in
 							let path = attach ty tmp_sr_uuid gp false in
 							let result = continuation path in
 							detach ty tmp_sr_uuid gp;
 							result
 						end
 						| None ->
-							let test =
+(*							let test =
 								Smapi_client.SR.probe (Smapi_client.execrpc_get_stderr Drivers.hba) gp []
 							in
-							Xml.parse_string test
+							Xml.parse_string test*)
+						  failwith "Unimplemented"
 				end
 			end
 		| File Nfs ->

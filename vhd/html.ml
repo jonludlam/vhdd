@@ -2,11 +2,11 @@
 open Listext
 open Pervasiveext
 open Vhd_types
-open Smapi_types
 open Int_types
 open Stringext
 open Threadext
 open Vhd_records
+open Context
 
 type updates = {
 	id : int;
@@ -171,7 +171,7 @@ let current_op_to_table_row id op =
 	tr [td [text id]; td [text (Jsonrpc.to_string (Vhd_types.rpc_of_slave_op op))]]
 
 let slave_to_html k metadata =
-	let inner = [span [text "SR UUID: "; text metadata.s_data.s_sr.sr_uuid; text (if metadata.s_data.s_ready then " (ready)" else " (not ready)") ]] @ 
+	let inner = [span [text "SR UUID: "; text metadata.s_data.s_sr; text (if metadata.s_data.s_ready then " (ready)" else " (not ready)") ]] @ 
 		(match metadata.s_data.s_master with
 			| Some m -> [h 2 [text "Current master"];
 			  table ((thead [tr [th [text "uuid"]; th [text "ip"]; th [text "port"]]])::

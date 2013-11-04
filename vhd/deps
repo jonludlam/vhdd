@@ -1,203 +1,184 @@
-attachments.cmo: vhd_types.cmo ../smapi/smapi_types.cmo int_types.cmo \
-    global.cmo attachments.cmi 
-attachments.cmx: vhd_types.cmx ../smapi/smapi_types.cmx int_types.cmx \
-    global.cmx attachments.cmi 
-circ.cmo: circ.cmi 
-circ.cmx: circ.cmi 
-clone.cmo: xapi.cmo vhdutil.cmo vhd_types.cmo vhd_records.cmi \
-    ../smapi/smapi_types.cmo master_utils.cmo lvmabs.cmi locking.cmo \
-    int_types.cmo id_map.cmo coalesce.cmi 
-clone.cmx: xapi.cmx vhdutil.cmx vhd_types.cmx vhd_records.cmx \
-    ../smapi/smapi_types.cmx master_utils.cmx lvmabs.cmx locking.cmx \
-    int_types.cmx id_map.cmx coalesce.cmx 
-coalesce.cmo: vhdutil.cmo vhd_types.cmo vhd_records.cmi tracelog.cmo \
+attachments.cmo : vhd_types.cmo int_types.cmo global.cmo attachments.cmi
+attachments.cmx : vhd_types.cmx int_types.cmx global.cmx attachments.cmi
+circ.cmo : circ.cmi
+circ.cmx : circ.cmi
+clone.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi master_utils.cmo \
+    lvmabs.cmi locking.cmo int_types.cmo id_map.cmo coalesce.cmi
+clone.cmx : vhdutil.cmx vhd_types.cmx vhd_records.cmx master_utils.cmx \
+    lvmabs.cmx locking.cmx int_types.cmx id_map.cmx coalesce.cmx
+coalesce.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi tracelog.cmo \
     nmutex.cmo master_utils.cmo lvmabs_types.cmi lvmabs.cmi locking.cmo \
-    int_types.cmo html.cmo coalesce.cmi 
-coalesce.cmx: vhdutil.cmx vhd_types.cmx vhd_records.cmx tracelog.cmx \
+    int_types.cmo html.cmo coalesce.cmi
+coalesce.cmx : vhdutil.cmx vhd_types.cmx vhd_records.cmx tracelog.cmx \
     nmutex.cmx master_utils.cmx lvmabs_types.cmx lvmabs.cmx locking.cmx \
-    int_types.cmx html.cmx coalesce.cmi 
-debug_utils.cmo: int_rpc.cmo 
-debug_utils.cmx: int_rpc.cmx 
-dot.cmo: vhd_types.cmo vhd_records.cmi nmutex.cmo 
-dot.cmx: vhd_types.cmx vhd_records.cmx nmutex.cmx 
-drivers.cmo: vhd_types.cmo ../smapi/smapi_types.cmo 
-drivers.cmx: vhd_types.cmx ../smapi/smapi_types.cmx 
-errors.cmo: 
-errors.cmx: 
-extentlist.cmo: 
-extentlist.cmx: 
-fake_tapdisk.cmo: 
-fake_tapdisk.cmx: 
-fd_pass_receiver.cmo: ../smapi/smapi_types.cmo global.cmo 
-fd_pass_receiver.cmx: ../smapi/smapi_types.cmx global.cmx 
-fileserver.cmo: 
-fileserver.cmx: 
-fsutils.cmo: 
-fsutils.cmx: 
-global.cmo: xapi_inventory.cmo int_types.cmo 
-global.cmx: xapi_inventory.cmx int_types.cmx 
-host.cmo: int_types.cmo host.cmi 
-host.cmx: int_types.cmx host.cmi 
-html.cmo: vhdutil.cmo vhd_types.cmo vhd_records.cmi ../smapi/smapi_types.cmo \
-    nmutex.cmo lvmabs.cmi int_types.cmo global.cmo dot.cmo attachments.cmi 
-html.cmx: vhdutil.cmx vhd_types.cmx vhd_records.cmx ../smapi/smapi_types.cmx \
-    nmutex.cmx lvmabs.cmx int_types.cmx global.cmx dot.cmx attachments.cmx 
-id_map.cmo: vhdutil.cmo vhd_types.cmo vhd_records.cmi tracelog.cmo nmutex.cmo \
-    lvmabs_types.cmi lvmabs.cmi html.cmo 
-id_map.cmx: vhdutil.cmx vhd_types.cmx vhd_records.cmx tracelog.cmx nmutex.cmx \
-    lvmabs_types.cmx lvmabs.cmx html.cmx 
-int_client.cmo: vhd_types.cmo vhd_records.cmi ../smapi/smapi_types.cmo \
-    lvmabs_types.cmi int_types.cmo int_rpc.cmo global.cmo 
-int_client.cmx: vhd_types.cmx vhd_records.cmx ../smapi/smapi_types.cmx \
-    lvmabs_types.cmx int_types.cmx int_rpc.cmx global.cmx 
-int_client_utils.cmo: vhdrpc.cmo vhd_types.cmo tracelog.cmo \
-    ../smapi/smapi_types.cmo slave_sr_attachments.cmo int_types.cmo \
-    int_rpc.cmo 
-int_client_utils.cmx: vhdrpc.cmx vhd_types.cmx tracelog.cmx \
-    ../smapi/smapi_types.cmx slave_sr_attachments.cmx int_types.cmx \
-    int_rpc.cmx 
-int_rpc.cmo: int_types.cmo extentlist.cmo 
-int_rpc.cmx: int_types.cmx extentlist.cmx 
-int_server.cmo: vhdutil.cmo vhdsm.cmi vhd_types.cmo vhd_records.cmi \
-    ../smapi/smapi_types.cmo nmutex.cmo lvmabs_types.cmi int_types.cmo \
-    int_rpc.cmo global.cmo debug_utils.cmo attachments.cmi 
-int_server.cmx: vhdutil.cmx vhdsm.cmx vhd_types.cmx vhd_records.cmx \
-    ../smapi/smapi_types.cmx nmutex.cmx lvmabs_types.cmx int_types.cmx \
-    int_rpc.cmx global.cmx debug_utils.cmx attachments.cmx 
-int_types.cmo: ../smapi/smapi_types.cmo 
-int_types.cmx: ../smapi/smapi_types.cmx 
-iscsilib.cmo: 
-iscsilib.cmx: 
-leaf_coalesce.cmo: vhdutil.cmo vhd_types.cmo vhd_records.cmi \
-    ../smapi/smapi_types.cmo nmutex.cmo master_utils.cmo lvmabs.cmi \
-    locking.cmo int_types.cmo int_client_utils.cmo int_client.cmo id_map.cmo \
-    global.cmo coalesce.cmi 
-leaf_coalesce.cmx: vhdutil.cmx vhd_types.cmx vhd_records.cmx \
-    ../smapi/smapi_types.cmx nmutex.cmx master_utils.cmx lvmabs.cmx \
-    locking.cmx int_types.cmx int_client_utils.cmx int_client.cmx id_map.cmx \
-    global.cmx coalesce.cmx 
-lockgen.cmo: nmutex.cmo lockgen.cmi 
-lockgen.cmx: nmutex.cmx lockgen.cmi 
-lockgentest.cmo: ../smapi/smapi_types.cmo nmutex.cmo lockgen.cmi 
-lockgentest.cmx: ../smapi/smapi_types.cmx nmutex.cmx lockgen.cmx 
-locking.cmo: vhd_types.cmo vhd_records.cmi tracelog.cmo \
-    ../smapi/smapi_types.cmo rwlock.cmo nmutex.cmo int_types.cmo html.cmo 
-locking.cmx: vhd_types.cmx vhd_records.cmx tracelog.cmx \
-    ../smapi/smapi_types.cmx rwlock.cmx nmutex.cmx int_types.cmx html.cmx 
-lockingtest.cmo: ../smapi/smapi_types.cmo ../smapi/smapi_client.cmo \
-    int_client.cmo 
-lockingtest.cmx: ../smapi/smapi_types.cmx ../smapi/smapi_client.cmx \
-    int_client.cmx 
-lvmabs.cmo: tracelog.cmo olvm.cmi lvmabs_types.cmi int_types.cmo host.cmi \
-    fsutils.cmo circ.cmi lvmabs.cmi 
-lvmabs.cmx: tracelog.cmx olvm.cmx lvmabs_types.cmx int_types.cmx host.cmx \
-    fsutils.cmx circ.cmx lvmabs.cmi 
-lvmabs_types.cmo: olvm.cmi lvmabs_types.cmi 
-lvmabs_types.cmx: olvm.cmx lvmabs_types.cmi 
-master_probe.cmo: vhdrpc.cmo vhd_types.cmo ../smapi/smapi_types.cmo \
-    lvmabs.cmi int_types.cmo int_rpc.cmo int_client.cmo drivers.cmo 
-master_probe.cmx: vhdrpc.cmx vhd_types.cmx ../smapi/smapi_types.cmx \
-    lvmabs.cmx int_types.cmx int_rpc.cmx int_client.cmx drivers.cmx 
-master_utils.cmo: vhdutil.cmo vhd_types.cmo vhd_records.cmi nmutex.cmo \
+    int_types.cmx html.cmx coalesce.cmi
+context.cmo :
+context.cmx :
+debug_utils.cmo : int_rpc.cmo
+debug_utils.cmx : int_rpc.cmx
+dot.cmo : vhd_types.cmo vhd_records.cmi nmutex.cmo
+dot.cmx : vhd_types.cmx vhd_records.cmx nmutex.cmx
+drivers.cmo : vhd_types.cmo context.cmo
+drivers.cmx : vhd_types.cmx context.cmx
+errors.cmo :
+errors.cmx :
+extentlist.cmo :
+extentlist.cmx :
+fake_tapdisk.cmo :
+fake_tapdisk.cmx :
+fd_pass_receiver.cmo : global.cmo
+fd_pass_receiver.cmx : global.cmx
+fileserver.cmo :
+fileserver.cmx :
+fsutils.cmo :
+fsutils.cmx :
+global.cmo : int_types.cmo
+global.cmx : int_types.cmx
+host.cmo : int_types.cmo host.cmi
+host.cmx : int_types.cmx host.cmi
+html.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi nmutex.cmo lvmabs.cmi \
+    int_types.cmo global.cmo dot.cmo context.cmo attachments.cmi
+html.cmx : vhdutil.cmx vhd_types.cmx vhd_records.cmx nmutex.cmx lvmabs.cmx \
+    int_types.cmx global.cmx dot.cmx context.cmx attachments.cmx
+id_map.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi tracelog.cmo \
+    nmutex.cmo lvmabs_types.cmi lvmabs.cmi html.cmo
+id_map.cmx : vhdutil.cmx vhd_types.cmx vhd_records.cmx tracelog.cmx \
+    nmutex.cmx lvmabs_types.cmx lvmabs.cmx html.cmx
+int_client.cmo : vhd_types.cmo vhd_records.cmi lvmabs_types.cmi \
+    int_types.cmo int_rpc.cmo global.cmo
+int_client.cmx : vhd_types.cmx vhd_records.cmx lvmabs_types.cmx \
+    int_types.cmx int_rpc.cmx global.cmx
+int_client_utils.cmo : vhdrpc.cmo vhd_types.cmo tracelog.cmo \
+    slave_sr_attachments.cmo int_types.cmo int_rpc.cmo
+int_client_utils.cmx : vhdrpc.cmx vhd_types.cmx tracelog.cmx \
+    slave_sr_attachments.cmx int_types.cmx int_rpc.cmx
+int_rpc.cmo : int_types.cmo extentlist.cmo
+int_rpc.cmx : int_types.cmx extentlist.cmx
+int_server.cmo : vhdutil.cmo vhdsm.cmi vhd_types.cmo vhd_records.cmi \
+    nmutex.cmo lvmabs_types.cmi int_types.cmo int_rpc.cmo global.cmo \
+    debug_utils.cmo attachments.cmi
+int_server.cmx : vhdutil.cmx vhdsm.cmx vhd_types.cmx vhd_records.cmx \
+    nmutex.cmx lvmabs_types.cmx int_types.cmx int_rpc.cmx global.cmx \
+    debug_utils.cmx attachments.cmx
+int_types.cmo : context.cmo
+int_types.cmx : context.cmx
+iscsilib.cmo :
+iscsilib.cmx :
+leaf_coalesce.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi nmutex.cmo \
+    master_utils.cmo lvmabs.cmi locking.cmo int_types.cmo \
+    int_client_utils.cmo int_client.cmo id_map.cmo global.cmo coalesce.cmi
+leaf_coalesce.cmx : vhdutil.cmx vhd_types.cmx vhd_records.cmx nmutex.cmx \
+    master_utils.cmx lvmabs.cmx locking.cmx int_types.cmx \
+    int_client_utils.cmx int_client.cmx id_map.cmx global.cmx coalesce.cmx
+lockgen.cmo : nmutex.cmo lockgen.cmi
+lockgen.cmx : nmutex.cmx lockgen.cmi
+lockgentest.cmo : nmutex.cmo lockgen.cmi
+lockgentest.cmx : nmutex.cmx lockgen.cmx
+locking.cmo : vhd_types.cmo vhd_records.cmi tracelog.cmo rwlock.cmo \
+    nmutex.cmo int_types.cmo html.cmo
+locking.cmx : vhd_types.cmx vhd_records.cmx tracelog.cmx rwlock.cmx \
+    nmutex.cmx int_types.cmx html.cmx
+lockingtest.cmo : int_client.cmo
+lockingtest.cmx : int_client.cmx
+lvmabs.cmo : tracelog.cmo olvm.cmi lvmabs_types.cmi int_types.cmo host.cmi \
+    fsutils.cmo circ.cmi lvmabs.cmi
+lvmabs.cmx : tracelog.cmx olvm.cmx lvmabs_types.cmx int_types.cmx host.cmx \
+    fsutils.cmx circ.cmx lvmabs.cmi
+lvmabs_types.cmo : olvm.cmi lvmabs_types.cmi
+lvmabs_types.cmx : olvm.cmx lvmabs_types.cmi
+master_probe.cmo : vhdrpc.cmo vhd_types.cmo lvmabs.cmi int_types.cmo \
+    int_rpc.cmo int_client.cmo drivers.cmo context.cmo
+master_probe.cmx : vhdrpc.cmx vhd_types.cmx lvmabs.cmx int_types.cmx \
+    int_rpc.cmx int_client.cmx drivers.cmx context.cmx
+master_utils.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi nmutex.cmo \
     lvmabs.cmi locking.cmo int_types.cmo int_client_utils.cmo int_client.cmo \
-    html.cmo global.cmo 
-master_utils.cmx: vhdutil.cmx vhd_types.cmx vhd_records.cmx nmutex.cmx \
+    html.cmo global.cmo
+master_utils.cmx : vhdutil.cmx vhd_types.cmx vhd_records.cmx nmutex.cmx \
     lvmabs.cmx locking.cmx int_types.cmx int_client_utils.cmx int_client.cmx \
-    html.cmx global.cmx 
-nfs.cmo: 
-nfs.cmx: 
-nmutex.cmo: ../smapi/smapi_types.cmo int_types.cmo 
-nmutex.cmx: ../smapi/smapi_types.cmx int_types.cmx 
-ocamltest.cmo: ocamltest.cmi 
-ocamltest.cmx: ocamltest.cmi 
-olvm.cmo: olvm.cmi 
-olvm.cmx: olvm.cmi 
-rwlock.cmo: 
-rwlock.cmx: 
-scan.cmo: vhdutil.cmo vhd_types.cmo vhd_records.cmi lvmabs_types.cmi \
-    lvmabs.cmi 
-scan.cmx: vhdutil.cmx vhd_types.cmx vhd_records.cmx lvmabs_types.cmx \
-    lvmabs.cmx 
-slave_sr_attachments.cmo: vhd_types.cmo tracelog.cmo nmutex.cmo lvmabs.cmi \
-    int_types.cmo html.cmo global.cmo circ.cmi 
-slave_sr_attachments.cmx: vhd_types.cmx tracelog.cmx nmutex.cmx lvmabs.cmx \
-    int_types.cmx html.cmx global.cmx circ.cmx 
-tapdisk_listen.cmo: vhdrpc.cmo int_rpc.cmo int_client.cmo global.cmo 
-tapdisk_listen.cmx: vhdrpc.cmx int_rpc.cmx int_client.cmx global.cmx 
-tapdisk.cmo: global.cmo 
-tapdisk.cmx: global.cmx 
-tracelog.cmo: vhd_types.cmo vhd_records.cmi ../smapi/smapi_types.cmo \
-    nmutex.cmo lvmabs_types.cmi int_types.cmo 
-tracelog.cmx: vhd_types.cmx vhd_records.cmx ../smapi/smapi_types.cmx \
-    nmutex.cmx lvmabs_types.cmx int_types.cmx 
-transport.cmo: ../smapi/smapi_types.cmo ../smapi/smapi_client.cmo \
-    ../smapi/smapi.cmo olvm.cmi nfs.cmo iscsilib.cmo errors.cmo drivers.cmo 
-transport.cmx: ../smapi/smapi_types.cmx ../smapi/smapi_client.cmx \
-    ../smapi/smapi.cmx olvm.cmx nfs.cmx iscsilib.cmx errors.cmx drivers.cmx 
-vhdd.cmo: vhdsm.cmi vhdrpc.cmo tracelog.cmo tapdisk_listen.cmo tapdisk.cmo \
-    ../smapi/smapi_types.cmo ../smapi/smapi.cmo ../smapi/process_xmlrpc.cmo \
+    html.cmx global.cmx
+nfs.cmo :
+nfs.cmx :
+nmutex.cmo : int_types.cmo context.cmo
+nmutex.cmx : int_types.cmx context.cmx
+ocamltest.cmo : ocamltest.cmi
+ocamltest.cmx : ocamltest.cmi
+olvm.cmo : olvm.cmi
+olvm.cmx : olvm.cmi
+rwlock.cmo :
+rwlock.cmx :
+scan.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi lvmabs_types.cmi \
+    lvmabs.cmi
+scan.cmx : vhdutil.cmx vhd_types.cmx vhd_records.cmx lvmabs_types.cmx \
+    lvmabs.cmx
+slave_sr_attachments.cmo : vhd_types.cmo tracelog.cmo nmutex.cmo lvmabs.cmi \
+    int_types.cmo html.cmo global.cmo circ.cmi
+slave_sr_attachments.cmx : vhd_types.cmx tracelog.cmx nmutex.cmx lvmabs.cmx \
+    int_types.cmx html.cmx global.cmx circ.cmx
+tapdisk.cmo : global.cmo
+tapdisk.cmx : global.cmx
+tapdisk_listen.cmo : vhdrpc.cmo int_rpc.cmo int_client.cmo global.cmo
+tapdisk_listen.cmx : vhdrpc.cmx int_rpc.cmx int_client.cmx global.cmx
+tracelog.cmo : vhd_types.cmo vhd_records.cmi nmutex.cmo lvmabs_types.cmi \
+    int_types.cmo context.cmo
+tracelog.cmx : vhd_types.cmx vhd_records.cmx nmutex.cmx lvmabs_types.cmx \
+    int_types.cmx context.cmx
+transport.cmo : vhd_types.cmo olvm.cmi nfs.cmo iscsilib.cmo errors.cmo \
+    drivers.cmo
+transport.cmx : vhd_types.cmx olvm.cmx nfs.cmx iscsilib.cmx errors.cmx \
+    drivers.cmx
+vhdMaster.cmo : vhdutil.cmo vhdrpc.cmo vhd_types.cmo vhd_records.cmi \
+    tracelog.cmo slave_sr_attachments.cmo scan.cmo rwlock.cmo olvm.cmi \
+    nmutex.cmo master_utils.cmo lvmabs_types.cmi lvmabs.cmi locking.cmo \
+    leaf_coalesce.cmo int_types.cmo int_rpc.cmo int_client_utils.cmo \
+    int_client.cmo id_map.cmo html.cmo global.cmo drivers.cmo coalesce.cmi \
+    clone.cmo attachments.cmi
+vhdMaster.cmx : vhdutil.cmx vhdrpc.cmx vhd_types.cmx vhd_records.cmx \
+    tracelog.cmx slave_sr_attachments.cmx scan.cmx rwlock.cmx olvm.cmx \
+    nmutex.cmx master_utils.cmx lvmabs_types.cmx lvmabs.cmx locking.cmx \
+    leaf_coalesce.cmx int_types.cmx int_rpc.cmx int_client_utils.cmx \
+    int_client.cmx id_map.cmx html.cmx global.cmx drivers.cmx coalesce.cmx \
+    clone.cmx attachments.cmx
+vhdSlave.cmo : vhdutil.cmo vhdrpc.cmo vhd_types.cmo tracelog.cmo tapdisk.cmo \
+    nmutex.cmo leaf_coalesce.cmo int_types.cmo int_client_utils.cmo \
+    int_client.cmo html.cmo host.cmi global.cmo drivers.cmo attachments.cmi
+vhdSlave.cmx : vhdutil.cmx vhdrpc.cmx vhd_types.cmx tracelog.cmx tapdisk.cmx \
+    nmutex.cmx leaf_coalesce.cmx int_types.cmx int_client_utils.cmx \
+    int_client.cmx html.cmx host.cmx global.cmx drivers.cmx attachments.cmx
+vhd_records.cmo : vhdutil.cmo ocamltest.cmi nmutex.cmo lvmabs_types.cmi \
+    context.cmo vhd_records.cmi
+vhd_records.cmx : vhdutil.cmx ocamltest.cmx nmutex.cmx lvmabs_types.cmx \
+    context.cmx vhd_records.cmi
+vhd_types.cmo : vhdutil.cmo vhd_records.cmi rwlock.cmo nmutex.cmo \
+    lvmabs_types.cmi lockgen.cmi int_types.cmo
+vhd_types.cmx : vhdutil.cmx vhd_records.cmx rwlock.cmx nmutex.cmx \
+    lvmabs_types.cmx lockgen.cmx int_types.cmx
+vhdd.cmo : vhdsm.cmi vhdrpc.cmo tracelog.cmo tapdisk_listen.cmo tapdisk.cmo \
     int_server.cmo int_rpc.cmo html.cmo global.cmo fileserver.cmo \
-    fd_pass_receiver.cmo drivers.cmo attachments.cmi 
-vhdd.cmx: vhdsm.cmx vhdrpc.cmx tracelog.cmx tapdisk_listen.cmx tapdisk.cmx \
-    ../smapi/smapi_types.cmx ../smapi/smapi.cmx ../smapi/process_xmlrpc.cmx \
+    fd_pass_receiver.cmo drivers.cmo attachments.cmi
+vhdd.cmx : vhdsm.cmx vhdrpc.cmx tracelog.cmx tapdisk_listen.cmx tapdisk.cmx \
     int_server.cmx int_rpc.cmx html.cmx global.cmx fileserver.cmx \
-    fd_pass_receiver.cmx drivers.cmx attachments.cmx 
-vhdMaster.cmo: xapi.cmo vhdutil.cmo vhdrpc.cmo vhd_types.cmo vhd_records.cmi \
-    tracelog.cmo ../smapi/smapi_types.cmo slave_sr_attachments.cmo scan.cmo \
-    rwlock.cmo olvm.cmi nmutex.cmo master_utils.cmo lvmabs_types.cmi \
-    lvmabs.cmi locking.cmo leaf_coalesce.cmo int_types.cmo int_rpc.cmo \
-    int_client_utils.cmo int_client.cmo id_map.cmo html.cmo global.cmo \
-    drivers.cmo coalesce.cmi clone.cmo attachments.cmi 
-vhdMaster.cmx: xapi.cmx vhdutil.cmx vhdrpc.cmx vhd_types.cmx vhd_records.cmx \
-    tracelog.cmx ../smapi/smapi_types.cmx slave_sr_attachments.cmx scan.cmx \
-    rwlock.cmx olvm.cmx nmutex.cmx master_utils.cmx lvmabs_types.cmx \
-    lvmabs.cmx locking.cmx leaf_coalesce.cmx int_types.cmx int_rpc.cmx \
-    int_client_utils.cmx int_client.cmx id_map.cmx html.cmx global.cmx \
-    drivers.cmx coalesce.cmx clone.cmx attachments.cmx 
-vhd_records.cmo: vhdutil.cmo ../smapi/smapi_types.cmo ocamltest.cmi \
-    nmutex.cmo lvmabs_types.cmi vhd_records.cmi 
-vhd_records.cmx: vhdutil.cmx ../smapi/smapi_types.cmx ocamltest.cmx \
-    nmutex.cmx lvmabs_types.cmx vhd_records.cmi 
-vhdrpc.cmo: global.cmo 
-vhdrpc.cmx: global.cmx 
-vhdSlave.cmo: vhdutil.cmo vhdrpc.cmo vhd_types.cmo tracelog.cmo tapdisk.cmo \
-    ../smapi/smapi_types.cmo ../smapi/smapi_client.cmo nmutex.cmo \
-    leaf_coalesce.cmo int_types.cmo int_client_utils.cmo int_client.cmo \
-    html.cmo host.cmi global.cmo drivers.cmo attachments.cmi 
-vhdSlave.cmx: vhdutil.cmx vhdrpc.cmx vhd_types.cmx tracelog.cmx tapdisk.cmx \
-    ../smapi/smapi_types.cmx ../smapi/smapi_client.cmx nmutex.cmx \
-    leaf_coalesce.cmx int_types.cmx int_client_utils.cmx int_client.cmx \
-    html.cmx host.cmx global.cmx drivers.cmx attachments.cmx 
-vhdsm.cmo: vhdrpc.cmo vhd_types.cmo vhdSlave.cmo vhdMaster.cmo transport.cmo \
-    ../smapi/smapi_types.cmo slave_sr_attachments.cmo nmutex.cmo \
-    master_probe.cmo lvmabs.cmi int_types.cmo html.cmo host.cmi global.cmo \
-    drivers.cmo attachments.cmi vhdsm.cmi 
-vhdsm.cmx: vhdrpc.cmx vhd_types.cmx vhdSlave.cmx vhdMaster.cmx transport.cmx \
-    ../smapi/smapi_types.cmx slave_sr_attachments.cmx nmutex.cmx \
-    master_probe.cmx lvmabs.cmx int_types.cmx html.cmx host.cmx global.cmx \
-    drivers.cmx attachments.cmx vhdsm.cmi 
-vhd_types.cmo: vhdutil.cmo vhd_records.cmi ../smapi/smapi_types.cmo \
-    rwlock.cmo nmutex.cmo lvmabs_types.cmi lockgen.cmi int_types.cmo 
-vhd_types.cmx: vhdutil.cmx vhd_records.cmx ../smapi/smapi_types.cmx \
-    rwlock.cmx nmutex.cmx lvmabs_types.cmx lockgen.cmx int_types.cmx 
-vhdutil.cmo: global.cmo 
-vhdutil.cmx: global.cmx 
-xapi_inventory.cmo: 
-xapi_inventory.cmx: 
-xapi.cmo: vhdutil.cmo vhd_types.cmo vhd_records.cmi ../smapi/smapi_types.cmo \
-    lvmabs.cmi locking.cmo 
-xapi.cmx: vhdutil.cmx vhd_types.cmx vhd_records.cmx ../smapi/smapi_types.cmx \
-    lvmabs.cmx locking.cmx 
-attachments.cmi: vhd_types.cmo ../smapi/smapi_types.cmo int_types.cmo 
-circ.cmi: 
-coalesce.cmi: vhdutil.cmo vhd_types.cmo vhd_records.cmi \
-    ../smapi/smapi_types.cmo lvmabs_types.cmi 
-host.cmi: int_types.cmo 
-lockgen.cmi: ../smapi/smapi_types.cmo 
-lvmabs.cmi: ../smapi/smapi_types.cmo lvmabs_types.cmi int_types.cmo 
-lvmabs_types.cmi: olvm.cmi 
-ocamltest.cmi: 
-olvm.cmi: 
-vhd_records.cmi: vhdutil.cmo ../smapi/smapi_types.cmo ocamltest.cmi \
-    lvmabs_types.cmi 
-vhdsm.cmi: ../smapi/smapi_types.cmo int_types.cmo drivers.cmo attachments.cmi 
+    fd_pass_receiver.cmx drivers.cmx attachments.cmx
+vhdrpc.cmo : global.cmo
+vhdrpc.cmx : global.cmx
+vhdsm.cmo : vhdrpc.cmo vhd_types.cmo vhdSlave.cmo vhdMaster.cmo \
+    transport.cmo slave_sr_attachments.cmo nmutex.cmo master_probe.cmo \
+    lvmabs.cmi int_types.cmo html.cmo host.cmi global.cmo drivers.cmo \
+    attachments.cmi vhdsm.cmi
+vhdsm.cmx : vhdrpc.cmx vhd_types.cmx vhdSlave.cmx vhdMaster.cmx \
+    transport.cmx slave_sr_attachments.cmx nmutex.cmx master_probe.cmx \
+    lvmabs.cmx int_types.cmx html.cmx host.cmx global.cmx drivers.cmx \
+    attachments.cmx vhdsm.cmi
+vhdutil.cmo : global.cmo
+vhdutil.cmx : global.cmx
+attachments.cmi : vhd_types.cmo int_types.cmo
+circ.cmi :
+coalesce.cmi : vhdutil.cmo vhd_types.cmo vhd_records.cmi lvmabs_types.cmi \
+    context.cmo
+host.cmi : int_types.cmo
+lockgen.cmi : context.cmo
+lvmabs.cmi : lvmabs_types.cmi int_types.cmo context.cmo
+lvmabs_types.cmi : olvm.cmi
+ocamltest.cmi :
+olvm.cmi :
+vhd_records.cmi : vhdutil.cmo ocamltest.cmi lvmabs_types.cmi context.cmo
+vhdsm.cmi : int_types.cmo drivers.cmo context.cmo attachments.cmi

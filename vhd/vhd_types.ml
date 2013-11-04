@@ -1,6 +1,5 @@
 
 open Int_types
-open Smapi_types
 open Vhd_records
 
 (*type attachment = {
@@ -21,8 +20,17 @@ type operation_ty =
 	| OpAttaching
 	| OpDetaching
 	| OpReattaching
-
 with rpc
+
+type generic_params = {
+  gp_device_config : (string * string) list;
+  gp_sr_sm_config : (string * string) list;
+} with rpc
+    
+type sr = { 
+  sr_uuid : string;
+} with rpc
+
 
 module MasterOperations = struct
   type operation = operation_ty
@@ -157,7 +165,7 @@ and slave_sr_metadata_data = {
 	s_master_approved_ops : (string, slave_op) Hashtbl.t;
 	s_attached_vdis : attached_vdis_t;
 	mutable s_ready : bool;
-	s_sr : sr;
+	s_sr : Storage_interface.sr;
 	s_thin_provisioning : bool;
 	mutable s_thin_provision_request_in_progress : bool;
 } with rpc

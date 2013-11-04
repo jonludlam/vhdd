@@ -1,14 +1,13 @@
 open Vhd_types
 open Int_types
 open Threadext
-open Smapi_types
 open Vhd_records
 
 exception RWModeLocked of string list (* VHD is attached with an incompatible RW mode on the hosts *)
 exception TimedOut
 exception VhdIsAttached
 
-module D = Debug.Debugger(struct let name="locking" end)
+module D = Debug.Make(struct let name="locking" end)
 open D
 
 
