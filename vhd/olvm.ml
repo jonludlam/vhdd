@@ -19,7 +19,7 @@ let lvresize = "/usr/sbin/lvresize"
 let lvrename = "/usr/sbin/lvrename"
 let pvdisplay = "/usr/sbin/pvdisplay"
 
-module D=Debug.Debugger(struct let name="olvm" end)
+module D=Debug.Make(struct let name="olvm" end)
 open D
 
 let sector_size=512L
