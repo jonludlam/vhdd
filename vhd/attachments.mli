@@ -47,10 +47,10 @@ val detach_as_master : string -> unit
 val detach_as_slave : string -> unit
 
 (** Retrieve the master metadata *)
-val gmm : Vhd_types.sr -> Vhd_types.master_sr_metadata
+val gmm : Storage_interface.sr -> Vhd_types.master_sr_metadata
 
 (** Retrieve the slave metadata *)
-val gsm : Vhd_types.sr -> Vhd_types.slave_sr_metadata
+val gsm : Storage_interface.sr -> Vhd_types.slave_sr_metadata
 
 (** Map a function over the master metadatas *)
 val map_master_srs :

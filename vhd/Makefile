@@ -6,7 +6,7 @@ VERSION := $(shell hg parents --template "{rev}" 2>/dev/null || echo 0.0)
 OCAMLABI := $(shell ocamlc -version)
 OCAMLLIBDIR := $(shell ocamlc -where)
 OCAMLDESTDIR ?= $(OCAMLLIBDIR)
-
+LINKFLAG = -linkpkg
 OCAMLC = ocamlfind ocamlc -g
 OCAMLOPT = ocamlfind ocamlopt -g
 OCAMLPACKS = xcp,xcp-inventory,str,uuidm,camldm,lvm,rpclib.syntax,rpclib.json,netdev,threads,vhdlib,tapctl,http-svr,xcp.storage

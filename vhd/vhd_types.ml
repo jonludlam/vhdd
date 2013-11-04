@@ -27,11 +27,6 @@ type generic_params = {
   gp_sr_sm_config : (string * string) list;
 } with rpc
     
-type sr = { 
-  sr_uuid : string;
-} with rpc
-
-
 module MasterOperations = struct
   type operation = operation_ty
 

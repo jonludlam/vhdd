@@ -67,11 +67,11 @@ let detach_as_slave sr_uuid = Mutex.execute mutex (fun () -> Hashtbl.remove atta
 
 (** Get master metadata *)
 let gmm sr =
-	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_master sr.sr_uuid with Not_found -> failwith "Not attached")
+	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_master sr with Not_found -> failwith "Not attached")
 
 (** Get slave metadata *)
 let gsm sr =
-	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_slave sr.sr_uuid with Not_found -> failwith "Not attached")
+	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_slave sr with Not_found -> failwith "Not attached")
 
 (** Map over metadatas. Hold the lock while doing so... *)
 let map hashtbl fn =

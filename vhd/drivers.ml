@@ -94,7 +94,7 @@ let get_all_driver_names () =
 
 let get_driver_config driver_name =
 	try 
-		List.assoc driver_name driver_config
+		List.map (fun x -> x.key, x.description) (List.assoc driver_name driver_config)
 	with Not_found -> 
 		debug "Couldn't find any driver config for driver: %s" driver_name;
 		[]

@@ -62,7 +62,7 @@ module VDI = struct
 	let with_master_approved_op context metadata id op = with_op_inner context "Adding to master_approved_ops" (Tracelog.Slave_s_master_approved_ops_add (id,op)) "Removing from master_approved_ops" (Tracelog.Slave_s_master_approved_ops_remove id) metadata.s_data.s_master_approved_ops metadata id op
 
 	let attach_from_sai context metadata id slave_attach_info =
-		let sr_uuid = metadata.s_data.s_sr.sr_uuid in
+		let sr_uuid = metadata.s_data.s_sr in
         
 		let cleanup_funcs = ref [] in
         let add_to_cleanup_funcs f =
@@ -116,14 +116,14 @@ module VDI = struct
 			raise e
 				
 	let attach context metadata generic_params vdi writable =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 
 		if metadata.s_data.s_master = None then 
 			failwith "Can't attach a VDI without a master set";
 
 		let host_uuid = Global.get_host_uuid () in
-		let sr_uuid = metadata.s_data.s_sr.sr_uuid in
+		let sr_uuid = metadata.s_data.s_sr in
 
 		with_op context metadata id Attaching (fun () ->
 			let current = Nmutex.execute context metadata.s_mutex "Finding whether we're already attached"
@@ -165,7 +165,7 @@ module VDI = struct
 		end
 
 	let reattach_from_sai context metadata vdi sai =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 
 		(* If we've got slave_attach_info, the master knows we're reattaching *)
@@ -176,7 +176,7 @@ module VDI = struct
 				if not (Hashtbl.mem metadata.s_data.s_attached_vdis id) then
 					raise (IntError (e_not_attached, [id])));
 			
-			commit_slave_attach_info_to_disk metadata.s_data.s_sr.sr_uuid id sai;
+			commit_slave_attach_info_to_disk metadata.s_data.s_sr id sai;
 
 			Nmutex.execute context metadata.s_mutex "Performing inner part of reattach" (fun () ->
 				let old_savi = Hashtbl.find metadata.s_data.s_attached_vdis id in
@@ -233,7 +233,7 @@ module VDI = struct
 				in
 				
 				if sai<>old_sai then 
-					unpause metadata.s_data.s_sr.sr_uuid id savi;
+					unpause metadata.s_data.s_sr id savi;
 
 				Hashtbl.replace metadata.s_data.s_attached_vdis id savi;
 				Tracelog.append context (Tracelog.Slave_s_attached_vdis_update (id,savi)) None;	
@@ -241,7 +241,7 @@ module VDI = struct
 				Html.signal_slave_metadata_change metadata ()))
 
 		let reactivate context metadata vdi =
-			let id = vdi.vdi_location in
+			let id = vdi in
 
 			with_op context metadata id Reactivating (fun () ->
 				Nmutex.execute context metadata.s_mutex "Reactivating if necessary" (fun () -> 
@@ -249,13 +249,13 @@ module VDI = struct
 					if new_savi.savi_activated then begin
 						Int_client_utils.slave_retry_loop context [] (fun rpc -> 
 							
-							Int_client.Vdi.slave_activate rpc (Global.get_host_uuid ()) metadata.s_data.s_sr.sr_uuid id true) metadata
+							Int_client.Vdi.slave_activate rpc (Global.get_host_uuid ()) metadata.s_data.s_sr id true) metadata
 					end;
 				))
 
 
 	let reattach context metadata vdi =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 		debug "Reattaching vdi: %s" id;
 		
@@ -275,14 +275,14 @@ module VDI = struct
 			(* We can't be detached because of the 'with_op' fn above, so now we're safe *)
 			let sai = 
 				Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-					Int_client.Vdi.slave_attach rpc (Global.get_host_uuid ()) metadata.s_data.s_sr.sr_uuid id writable true) metadata in
+					Int_client.Vdi.slave_attach rpc (Global.get_host_uuid ()) metadata.s_data.s_sr id writable true) metadata in
 			
 			debug "Got response: leaf=%s" sai.sa_leaf_path;
 			
 			reattach_from_sai context metadata vdi sai)
 
 	let detach context metadata generic_params vdi =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 		(* Nb. tapdisk _should_ be already dead at this point *)
 
@@ -304,19 +304,19 @@ module VDI = struct
 					Nmutex.execute context metadata.s_mutex "Deactivating tapdisk if necessary" (fun () -> 
 						if Tapdisk.get_activated x then begin
 							debug "WARNING: Tapdisk not deactivated at detach time";
-							Tapdisk.deactivate x metadata.s_data.s_sr.sr_uuid id savi.savi_attach_info.sa_leaf_path;
+							Tapdisk.deactivate x metadata.s_data.s_sr id savi.savi_attach_info.sa_leaf_path;
 							savi.savi_activated <- false;
 							Html.signal_slave_metadata_change metadata ();
 						end);
 
-					Tapdisk.detach x metadata.s_data.s_sr.sr_uuid id;
+					Tapdisk.detach x metadata.s_data.s_sr id;
 
 					begin
 						try
 							Int_client_utils.slave_retry_loop context [e_not_attached] (fun rpc -> 
 
 								Int_client.Vdi.slave_detach rpc
-								(Global.get_host_uuid ()) metadata.s_data.s_sr.sr_uuid id) metadata
+								(Global.get_host_uuid ()) metadata.s_data.s_sr id) metadata
 						with IntError(e,args) as exn ->
 							if e=e_not_attached
 							then debug "Ignoring not_attached exception from master"
@@ -346,7 +346,7 @@ module VDI = struct
 								Html.signal_slave_metadata_change metadata ();
 
 								(* Remove the attachment info from disk *)
-								remove_slave_attach_info_from_disk metadata.s_data.s_sr.sr_uuid id
+								remove_slave_attach_info_from_disk metadata.s_data.s_sr id
 							| None ->
 								failwith "Well that's pretty odd. What's going on here?")
 				| None ->
@@ -357,14 +357,14 @@ module VDI = struct
 		fix_ctx context (Some id);
 		Nmutex.execute context metadata.s_mutex "Activating tapdisk" (fun () ->
 			let savi = Hashtbl.find metadata.s_data.s_attached_vdis id in
-			Tapdisk.activate savi.savi_blktap2_dev metadata.s_data.s_sr.sr_uuid id savi.savi_attach_info.sa_leaf_path
+			Tapdisk.activate savi.savi_blktap2_dev metadata.s_data.s_sr id savi.savi_attach_info.sa_leaf_path
 				(if savi.savi_attach_info.sa_leaf_is_raw then Tapctl.Aio else Tapctl.Vhd);
 			savi.savi_activated <- true;
 			Html.signal_slave_metadata_change metadata ();
 		)
 
 	let activate context metadata generic_params vdi =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 
 		if metadata.s_data.s_master = None then
@@ -380,7 +380,7 @@ module VDI = struct
 				Int_client_utils.slave_retry_loop context [e_vdi_active_elsewhere] (fun rpc -> 
 
 					Int_client.Vdi.slave_activate rpc
-						(Global.get_host_uuid ()) metadata.s_data.s_sr.sr_uuid id false) metadata;
+						(Global.get_host_uuid ()) metadata.s_data.s_sr id false) metadata;
 				with_master_approved_op context metadata id Activating (fun () -> 
 					try
 						activate_unsafe context metadata id
@@ -390,12 +390,12 @@ module VDI = struct
 						(* Failed - deactivate on master *)
 						Int_client_utils.slave_retry_loop context [] (fun rpc -> 
 
-							Int_client.Vdi.slave_deactivate rpc (Global.get_host_uuid ()) metadata.s_data.s_sr.sr_uuid id) metadata;
+							Int_client.Vdi.slave_deactivate rpc (Global.get_host_uuid ()) metadata.s_data.s_sr id) metadata;
 						raise e)
 			end)
 
 	let deactivate context metadata generic_params vdi =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 
 		if metadata.s_data.s_master = None then
@@ -413,7 +413,7 @@ module VDI = struct
 						let rec deactivate_loop n =
 							if n=0 then failwith "Failed to deactivate!";
 							try
-								Tapdisk.deactivate savi.savi_blktap2_dev metadata.s_data.s_sr.sr_uuid id savi.savi_attach_info.sa_leaf_path;
+								Tapdisk.deactivate savi.savi_blktap2_dev metadata.s_data.s_sr id savi.savi_attach_info.sa_leaf_path;
 							with _ ->
 								Thread.delay 1.0; (* WARNING WARNING - sleeping with lock held!!! (shouldn't happen though) *)
 								deactivate_loop (n-1)
@@ -426,7 +426,7 @@ module VDI = struct
 			try
 				Int_client_utils.slave_retry_loop context [e_not_activated] (fun rpc -> 
 
-					Int_client.Vdi.slave_deactivate rpc	(Global.get_host_uuid ()) metadata.s_data.s_sr.sr_uuid id) metadata
+					Int_client.Vdi.slave_deactivate rpc	(Global.get_host_uuid ()) metadata.s_data.s_sr id) metadata
 			with
 				| IntError(e,args) as exn ->
 					if (e=e_not_activated)
@@ -440,7 +440,7 @@ module VDI = struct
 		debug "Got slave_reload call on the following VDIs:";
 		List.iter (fun (id,sai) ->
 			debug "id: %s" id;
-			reattach_from_sai context metadata {vdi_location=id; vdi_uuid=None} sai) ids
+			reattach_from_sai context metadata id sai) ids
 
 
 	(* If there are network problems during this call, the master will reissue the
@@ -456,7 +456,7 @@ module VDI = struct
 					if savi.savi_activated then Tapdisk.t_pause savi.savi_blktap2_dev;
 					Leaf_coalesce.slave_leaf_coalesce_copy context metadata savi.savi_attach_info.sa_leaf_path;
 					if savi.savi_activated then
-						Tapdisk.activate savi.savi_blktap2_dev metadata.s_data.s_sr.sr_uuid id new_leaf_path
+						Tapdisk.activate savi.savi_blktap2_dev metadata.s_data.s_sr id new_leaf_path
 							(if savi.savi_attach_info.sa_leaf_is_raw then Tapctl.Aio else Tapctl.Vhd))
 			end else
 				if new_leaf_path = savi.savi_attach_info.sa_leaf_path
@@ -498,25 +498,25 @@ module VDI = struct
 			ignore(Thread.create (fun () ->
 				Int_client_utils.slave_retry_loop context [] (fun rpc -> 
 
-					Int_client.SR.thin_provision_check rpc metadata.s_data.s_sr.sr_uuid) metadata ) ())
+					Int_client.SR.thin_provision_check rpc metadata.s_data.s_sr) metadata ) ())
 		else
 			()
 
 	let generate_config context metadata generic_params vdi =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
-		let sr_uuid = metadata.s_data.s_sr.sr_uuid in
+		let sr_uuid = metadata.s_data.s_sr in
 		let slave_attach_info = 
 			Int_client_utils.slave_retry_loop context [] (fun rpc -> 
 
 				Int_client.Vdi.get_slave_attach_info rpc sr_uuid id) metadata in
 		let arg = Jsonrpc.to_string (rpc_of_slave_attach_info slave_attach_info) in
-		let call = Smapi_client.make_call ~vdi_location:id generic_params (Some metadata.s_data.s_sr) "vdi_attach_from_config" [ arg ] in
+(*		let call = Smapi_client.make_call ~vdi_location:id generic_params (Some metadata.s_data.s_sr) "vdi_attach_from_config" [ arg ] in
 		let str = Xml.to_string (Smapi_client.xmlrpc_of_call call) in
-		str
+		str*) ""
 
 	let attach_and_activate_from_config context metadata generic_params vdi slave_attach_info =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 
 		with_op context metadata id AttachAndActivating (fun () ->
@@ -572,7 +572,7 @@ module SR = struct
 		let attached_vdis = Hashtbl.create 10 in
 
 		let scan_attachments () =
-			let slave_attach_dir = get_slave_attach_dir sr.sr_uuid in
+			let slave_attach_dir = get_slave_attach_dir sr in
 			Unixext.mkdir_rec slave_attach_dir 0o700;
 			let rec inner acc dh =
 				try
@@ -592,7 +592,7 @@ module SR = struct
 				let tapdev_and_link_opt =
 					try
 						let (tapdev,_,_,link) =
-							List.find (fun (_,sr',id',_) -> sr' = sr.sr_uuid && id' = id) tapdisk_srs_and_ids
+							List.find (fun (_,sr',id',_) -> sr' = sr && id' = id) tapdisk_srs_and_ids
 						in
 						Some (tapdev,link)
 					with Not_found ->
@@ -607,8 +607,8 @@ module SR = struct
 						let new_savi = { savi_attach_info = slave_attach_info;
 							savi_blktap2_dev = tapdev;
 							savi_resync_required = true;
-							savi_endpoint = Tapdisk.get_tapdev_link sr.sr_uuid id;
-							savi_link = Tapdisk.get_vhd_link sr.sr_uuid id slave_attach_info.sa_leaf_path;
+							savi_endpoint = Tapdisk.get_tapdev_link sr id;
+							savi_link = Tapdisk.get_vhd_link sr id slave_attach_info.sa_leaf_path;
 							savi_phys_size = 0L;
 							savi_maxsize = slave_attach_info.sa_leaf_maxsize;
 							savi_activated = activated;
@@ -622,14 +622,14 @@ module SR = struct
 						if activated then begin
 							if not paused then
 								Tapdisk.t_pause tapdev;
-							VDI.unpause sr.sr_uuid id new_savi
+							VDI.unpause sr id new_savi
 						end;
 
 						(* It's possible that we leak DM nodes *)
 						List.iter (fun dmn -> Host.bump_refcount dmn) slave_attach_info.sa_lvs
 					| None ->
 						  debug "Couldn't find the tapdev and link. Removing attach info";
-						VDI.remove_slave_attach_info_from_disk sr.sr_uuid id
+						VDI.remove_slave_attach_info_from_disk sr id
 			) files
 		in scan_attachments ();
 		let s_current_ops = Hashtbl.create 10 in
@@ -674,7 +674,7 @@ module SR = struct
 
 		Int_client_utils.slave_retry_loop context []
 			(fun rpc ->
-				ignore(Int_client.SR.slave_attach rpc "hello" metadata.s_data.s_sr.sr_uuid (Global.get_localhost ())
+				ignore(Int_client.SR.slave_attach rpc "hello" metadata.s_data.s_sr (Global.get_localhost ())
 					attached_vdis_list)) metadata;
 
 		debug "Registration functions finished. Setting s_ready=true";
@@ -698,13 +698,13 @@ module SR = struct
 		in
 		List.iter (fun (k,v) ->
 			try
-				let vdi = {vdi_uuid=None; vdi_location=k} in
+				let vdi = k in
 				VDI.reattach context metadata vdi;
 				VDI.reactivate context metadata vdi
 			with e ->
 				log_backtrace ();
 				warn "Error: caught exception while reattaching VDI: Detaching! (%s)" (Printexc.to_string e);
-				VDI.detach context metadata {gp_device_config=[]; gp_sr_sm_config=[]; gp_xapi_params=None} {vdi_uuid=None; vdi_location=k}
+				VDI.detach context metadata {gp_device_config=[]; gp_sr_sm_config=[]} k
 		) currently_attached;
 		let has_master_changed = 
 			match metadata.s_data.s_master with 
@@ -715,7 +715,7 @@ module SR = struct
 			metadata.s_data.s_master <- Some master;
 			Tracelog.append context (Tracelog.Slave_s_master (Some master)) (Some "Master has changed!");
 			Html.signal_slave_metadata_change metadata ();
-			Attachments.log_attachment_new_master metadata.s_data.s_sr.sr_uuid (Some master)
+			Attachments.log_attachment_new_master metadata.s_data.s_sr (Some master)
 		end
 
 	let thin_provision_check context metadata =
@@ -749,7 +749,7 @@ module SR = struct
 							let new_attach_infos = 
 								Int_client_utils.slave_retry_loop context [] (fun rpc -> 
 
-									Int_client.Vdi.thin_provision_request_more_space rpc metadata.s_data.s_sr.sr_uuid (Global.get_host_uuid ()) need_resizing) metadata in
+									Int_client.Vdi.thin_provision_request_more_space rpc metadata.s_data.s_sr (Global.get_host_uuid ()) need_resizing) metadata in
 							debug "New attach infos: length=%d" (List.length new_attach_infos);
 							List.iter (function ai ->
 								Nmutex.execute context metadata.s_mutex "Changing VDI" (fun () ->
@@ -760,7 +760,7 @@ module SR = struct
 											Host.change_lv (Mlvm ai);
 											(if v.savi_paused then
 												(debug "Resuming tapdisk: id=%s" k;
-												Tapdisk.activate v.savi_blktap2_dev metadata.s_data.s_sr.sr_uuid k v.savi_attach_info.sa_leaf_path
+												Tapdisk.activate v.savi_blktap2_dev metadata.s_data.s_sr k v.savi_attach_info.sa_leaf_path
 													(if v.savi_attach_info.sa_leaf_is_raw then Tapctl.Aio else Tapctl.Vhd)));
 											Some (k,{v with savi_maxsize =
 													Some (Int64.mul 512L

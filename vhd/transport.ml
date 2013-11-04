@@ -43,7 +43,7 @@ let attach ty sr_uuid gp is_create =
 					(match localiqn with
 						| Some l -> [(Drivers.localiqn,l)]
 						| _ -> []) @ device_config } in
-			let sr = (Some {sr_uuid=sr_uuid}) in
+			let sr = Some sr_uuid in
 (*			let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.iscsi) gp sr in
 			let scsiid = safe_assoc (Drivers.scsiid) device_config in
 			let path = Smapi_client.VDI.attach (Smapi_client.execrpc Drivers.iscsi) gp sr scsiid true in
@@ -53,7 +53,7 @@ let attach ty sr_uuid gp is_create =
 
 		| OldLvm Fc
 		| Lvm Fc ->
-			let sr = (Some {sr_uuid=sr_uuid}) in
+			let sr = Some sr_uuid in
 			(*let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.hba) gp sr in
 			let scsiid = safe_assoc Drivers.scsiid device_config in
 			let path = Smapi_client.VDI.attach (Smapi_client.execrpc Drivers.hba) gp sr scsiid true in
@@ -156,14 +156,14 @@ let detach ty sr_uuid gp =
 					(match localiqn with
 						| Some l -> [(Drivers.localiqn,l)]
 						| _ -> []) @ device_config } in
-			let sr = (Some {sr_uuid=sr_uuid}) in
+			let sr = Some sr_uuid in
 			let scsiid = safe_assoc Drivers.scsiid device_config in
 (*			let _ = Smapi_client.VDI.detach (Smapi_client.execrpc Drivers.iscsi) gp sr scsiid in
 			Smapi_client.SR.detach (Smapi_client.execrpc Drivers.iscsi) gp sr*)
 			failwith "Unimplemented"
 		| Lvm Fc
 		| OldLvm Fc ->
-			let sr = (Some {sr_uuid=sr_uuid}) in
+			let sr = Some sr_uuid in
 			let scsiid = safe_assoc Drivers.scsiid device_config in
 (*			let _ = Smapi_client.VDI.detach (Smapi_client.execrpc Drivers.hba) gp sr scsiid in
 			Smapi_client.SR.detach (Smapi_client.execrpc Drivers.hba) gp sr*)
@@ -178,7 +178,7 @@ let detach ty sr_uuid gp =
 				Nfs.unmount localpath
 
 		| File Ext ->
-			let localpath =mount_path sr_uuid in
+			let localpath = mount_path sr_uuid in
 
 			if is_mounted localpath then
 				ignore(Forkhelpers.execute_command_get_output "/bin/umount" [localpath]);
@@ -233,7 +233,7 @@ let probe ty gp continuation =
 								(match localiqn with
 									| Some l -> [(Drivers.localiqn,l)]
 									| _ -> []) @ device_config } in
-						let sr = (Some {sr_uuid=tmp_sr_uuid}) in
+						let sr = Some tmp_sr_uuid in
 (*						let _ = Smapi_client.SR.attach (Smapi_client.execrpc Drivers.iscsi) gp sr in
 						let vdis = Pervasiveext.finally
 							(fun () ->

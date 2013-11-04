@@ -32,7 +32,7 @@ let master_probe ctx driver path sr =
 				Lvmabs.init_lvm ctx (String.split ',' device)
 			| Drivers.OldLvm _ ->
 				let device = path in
-				Lvmabs.init_origlvm ctx sr.sr_uuid (String.split ',' device)
+				Lvmabs.init_origlvm ctx sr (String.split ',' device)
 			| Drivers.File _ ->
 				let path = path in
 				Lvmabs.init_fs ctx path
@@ -52,7 +52,7 @@ let master_probe ctx driver path sr =
 							| None -> raise NoMaster
 					in
 					debug "host_attachments read: Master is apparently at uuid=%s ip=%s port=%d" m.h_uuid m.h_ip m.h_port;
-					if test_master ctx m sr.sr_uuid then
+					if test_master ctx m sr then
 						m
 					else
 						raise HostAttachmentsIncorrect

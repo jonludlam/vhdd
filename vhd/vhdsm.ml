@@ -1,9 +1,9 @@
 (* The SMAPI dispatcher module *)
 
-open Smapi_types
 open Int_types
 open Threadext
 open Stringext
+open Storage_interface
 
 module D = Debug.Make(struct let name="vhdsm" end)
 open D
@@ -11,13 +11,15 @@ open D
 module SR = struct
 	(* TODO: return more interesting configuration information *)
 	let get_driver_info ctx =
-		{ di_name = ctx.c_driver;
-		di_description = "Daemonized VHD SR";
-		di_vendor = "Ring 3";
-		di_copyright = "Citrix";
-		di_driver_version = "2";
-		di_required_api_version = "1.1";
-		di_capabilities = [
+	        let open Context in
+		{ driver = ctx.c_driver;
+		  name = ctx.c_driver;
+		  description = "Daemonized VHD SR";
+		  vendor = "Ring 3";
+		  copyright = "Citrix";
+		  version = "2";
+		  required_api_version = "1.1";
+		  features = [
 			"SR_PROBE";
 			"SR_UPDATE";
 			"VDI_CREATE";
@@ -33,7 +35,7 @@ module SR = struct
 			"VDI_UPDATE";
 			"VDI_INTRODUCE";
 		] @ (if Drivers.supports_ha ctx.c_driver then ["VDI_GENERATE_CONFIG"] else []);
-		di_configuration = Drivers.get_driver_config ctx.c_driver;
+		configuration = Drivers.get_driver_config ctx.c_driver;
 		}
 
 	let probe ctx gp sr_sm_config =
@@ -49,19 +51,18 @@ module SR = struct
 
 		let driver = Drivers.of_ctx ctx in
  		try
-			let path = Transport.attach driver sr.sr_uuid gp true in
+			let path = Transport.attach driver sr gp true in
 			VhdMaster.SR.create ctx driver path gp sr size;
-			Transport.detach driver sr.sr_uuid gp;
+			Transport.detach driver sr gp;
 		with Transport.MissingParam name ->
-			let probe_results = probe ctx gp [] in
-			raise (SmapiFault (107l,Xml.to_string probe_results))
+		        raise (Missing_configuration_parameter name)
 
 	let scan ctx gp sr = VhdMaster.SR.scan ctx (Drivers.of_ctx ctx) gp sr
 
 	let update ctx gp sr = VhdMaster.SR.update ctx (Drivers.of_ctx ctx) gp sr
 
 	let mode ctx sr_uuid =
-		let sr = {sr_uuid=sr_uuid} in
+		let sr = sr_uuid in
 		let slave_metadata = try Some (Attachments.gsm sr) with _ -> None in
 		let master_metadata = try Some (Attachments.gmm sr) with _ -> None in
 		match master_metadata, slave_metadata with
@@ -76,11 +77,11 @@ module SR = struct
 				| Drivers.Lvm _ ->
 					Lvmabs.init_lvm ctx (String.split ',' path)
 				| Drivers.OldLvm  _ ->
-					Lvmabs.init_origlvm ctx sr.sr_uuid (String.split ',' path)
+					Lvmabs.init_origlvm ctx sr (String.split ',' path)
 				| Drivers.File _ ->
 					Lvmabs.init_fs ctx path
 		in
-		Lvmabs.maybe_add_pv_ids ctx sr.sr_uuid container
+		Lvmabs.maybe_add_pv_ids ctx sr container
 
 	(* Here we do the attach-as-a-slave and attach-as-a-master. For
 	   the master case, we attach as a master first, since the slave
@@ -96,7 +97,7 @@ module SR = struct
 			match mode with
 				| Master ->
 					let master_conf = VhdMaster.SR.attach ctx generic_params driver path sr in
-					Attachments.attach_as_master sr.sr_uuid master_conf;
+					Attachments.attach_as_master sr master_conf;
 					Html.signal_master_metadata_change master_conf ();
 
 					slave_conf.Vhd_types.s_rpc <- (!Vhdrpc.local_rpc);
@@ -129,9 +130,9 @@ module SR = struct
 		Attachments.log_attachment 
 			{Attachments.drivertype=Drivers.string_of driver;
 			path=path;
-			uuid=sr.sr_uuid;
+			uuid=sr;
 			mode=mode;
-			device_config=generic_params.gp_device_config}
+			device_config=generic_params.Vhd_types.gp_device_config}
 
 
 	(* The attach function first attaches the underlying block device via
@@ -163,7 +164,7 @@ module SR = struct
 		match slave_metadata with
 			| Some s -> f s.Vhd_types.s_data.Vhd_types.s_path
 			| None ->
-				let path = Transport.attach driver sr.sr_uuid generic_params false in
+				let path = Transport.attach driver sr generic_params false in
 				try
 					(* If we've attached the transport, register any physical volumes
 					   that may be on the block device *)
@@ -173,7 +174,7 @@ module SR = struct
 					   stash the path info for later, and is also useful for 
 					   attach-from-config *)
 					let slave_conf = VhdSlave.SR.attach ctx path sr in
-					Attachments.attach_as_slave sr.sr_uuid slave_conf;
+					Attachments.attach_as_slave sr slave_conf;
 					Html.signal_slave_metadata_change slave_conf ();
 					
 					
@@ -183,16 +184,16 @@ module SR = struct
 					Attachments.log_attachment 
 						{Attachments.drivertype=Drivers.string_of driver;
 						path=path;
-						uuid=sr.sr_uuid;
+						uuid=sr;
 						mode=(Slave None);
-						device_config=generic_params.gp_device_config};
+						device_config=generic_params.Vhd_types.gp_device_config};
 					
 					(* Jump to the continuation *)
 					f slave_conf.Vhd_types.s_data.Vhd_types.s_path
 				with e ->
 					debug "Executing cleanup functions";
-					Host.remove_pv_id_info sr.sr_uuid;
-					Transport.detach driver sr.sr_uuid generic_params;
+					Host.remove_pv_id_info sr;
+					Transport.detach driver sr generic_params;
 					raise e
 
 	(* Figure out whether we should be attaching in master or slave mode. If we're
@@ -202,8 +203,8 @@ module SR = struct
 		let driver = Drivers.of_ctx ctx in
 		let mode =
 			try
-				if List.mem_assoc "SRmaster" generic_params.gp_device_config &&
-					List.assoc "SRmaster" generic_params.gp_device_config = "true" then
+				if List.mem_assoc "SRmaster" generic_params.Vhd_types.gp_device_config &&
+					List.assoc "SRmaster" generic_params.Vhd_types.gp_device_config = "true" then
 						Master
 				else
 					let host = Master_probe.master_probe ctx driver path sr in
@@ -227,18 +228,18 @@ module SR = struct
 			attach_in_mode ctx generic_params path sr mode false)
 
 	let reattach sr =
-		let ctx =  {c_driver=sr.Attachments.drivertype; c_api_call="sr_attach"; c_task_id=Uuidm.to_string (Uuidm.create Uuidm.(`V4)); c_other_info=[]} in
+		let ctx = Context.({c_driver=sr.Attachments.drivertype; c_api_call="sr_attach"; c_task_id=Uuidm.to_string (Uuidm.create Uuidm.(`V4)); c_other_info=[]}) in
 		let driver = Drivers.of_string sr.Attachments.drivertype in
 		let device_config = sr.Attachments.device_config in
 		let path = sr.Attachments.path in
 		let mode = sr.Attachments.mode in
-		let gp = {gp_device_config=device_config; gp_sr_sm_config=[]; gp_xapi_params=None} in
-		let sr' = {sr_uuid=sr.Attachments.uuid} in
+		let gp = Vhd_types.({gp_device_config=device_config; gp_sr_sm_config=[] }) in
+		let sr' = sr.Attachments.uuid in
 		maybe_add_pv_info ctx driver path sr';
 
 		try
 			let slave_conf = VhdSlave.SR.attach ctx path sr' in
-			Attachments.attach_as_slave sr'.sr_uuid slave_conf;
+			Attachments.attach_as_slave sr' slave_conf;
 			Html.signal_slave_metadata_change slave_conf ();
 			begin
 				try
@@ -274,12 +275,12 @@ module SR = struct
 		let mm = try Some (Attachments.gmm sr) with _ -> None in
 		(match mm with | Some m -> VhdMaster.SR.assert_can_detach ctx m generic_params | _ -> ());
 		(try
-			Attachments.log_detachment sr.sr_uuid
+			Attachments.log_detachment sr
 		with _ -> ());
 		(try
 			let metadata = Attachments.gsm sr in
 			VhdSlave.SR.detach ctx metadata generic_params;
-			Attachments.detach_as_slave sr.sr_uuid;
+			Attachments.detach_as_slave sr;
 			Html.signal_slave_metadata_change metadata ();
 		with _ -> ());
 		(try
@@ -291,12 +292,12 @@ module SR = struct
 				log_backtrace ();
 				debug "Caught exception: %s. Ignoring" (Printexc.to_string e)
 			end;
-			Attachments.detach_as_master sr.sr_uuid;
+			Attachments.detach_as_master sr;
 			Html.signal_master_metadata_change metadata ()
 		with _ -> ());
-		Host.remove_pv_id_info sr.sr_uuid;
+		Host.remove_pv_id_info sr;
 		let driver = Drivers.of_ctx ctx in
-		Transport.detach driver sr.sr_uuid generic_params
+		Transport.detach driver sr generic_params
 
 	let delete ctx gp sr = 
 		(* If we're attached, detach: *)
@@ -306,31 +307,31 @@ module SR = struct
 			| None -> ());
 		(* Now we can delete *)
 		let driver = Drivers.of_ctx ctx in
-		let path = Transport.attach driver sr.sr_uuid gp false in
-		Transport.delete driver sr.sr_uuid gp path 
+		let path = Transport.attach driver sr gp false in
+		Transport.delete driver sr gp path 
 
 	let content_type ctx generic_params sr = "phy"
 
 	(* These are internal calls that occur as part of a SR.attach on a
 	   slave.  *)
-	let slave_attach context tok sr host ids = VhdMaster.SR.slave_attach context (Attachments.gmm {sr_uuid=sr}) tok host ids
-	let slave_detach context tok sr host = VhdMaster.SR.slave_detach context (Attachments.gmm {sr_uuid=sr}) tok host
+	let slave_attach context tok sr host ids = VhdMaster.SR.slave_attach context (Attachments.gmm sr) tok host ids
+	let slave_detach context tok sr host = VhdMaster.SR.slave_detach context (Attachments.gmm sr) tok host
 
 	(* An internal call used as part of the attach process. This is
 	   called on a slave when the master has restarted and is
 	   reattaching its SRs. *)
 	let slave_recover ctx tok sr master =
-		let metadata = Attachments.gsm {sr_uuid=sr} in
+		let metadata = Attachments.gsm sr in
 		metadata.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task master.h_ip 4094);
 		VhdSlave.SR.slave_recover ctx metadata tok master
 
 	(* Part of the infrastructure to support thin provisioning *)
-	let thin_provision_check ctx sr = VhdSlave.SR.thin_provision_check ctx (Attachments.gsm {sr_uuid=sr})
+	let thin_provision_check ctx sr = VhdSlave.SR.thin_provision_check ctx (Attachments.gsm sr)
 end
 
 module VDI = struct
 	let create ctx gp sr sm_config size =
-		info "API call: VDI.create sr=%s size=%Ld sm_config=[%s]" sr.sr_uuid size (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) sm_config));
+		info "API call: VDI.create sr=%s size=%Ld sm_config=[%s]" sr size (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) sm_config));
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.create ctx metadata gp sm_config size
 
@@ -340,57 +341,57 @@ module VDI = struct
 		VhdMaster.VDI.update ctx metadata gp vdi
 
 	let introduce ctx gp sr uuid sm_config location =
-		info "API call: VDI.introduce sr=%s uuid=%s location=%s sm_config=[%s]" sr.sr_uuid uuid location (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) sm_config));
+		info "API call: VDI.introduce sr=%s uuid=%s location=%s sm_config=[%s]" sr uuid location (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) sm_config));
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.introduce ctx metadata gp uuid sm_config location
 
 	let delete ctx gp sr vdi =
-		info "API call: VDI.delete sr=%s vdi_location=%s" sr.sr_uuid vdi.vdi_location;
+		info "API call: VDI.delete sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.delete ctx metadata gp vdi
 
 	let snapshot ctx gp driver_params sr vdi =
-		info "API call: VDI.snapshot sr=%s vdi_location=%s driver_params=[%s]" sr.sr_uuid vdi.vdi_location (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) driver_params));
+		info "API call: VDI.snapshot sr=%s vdi=%s driver_params=[%s]" sr vdi (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) driver_params));
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.snapshot ctx metadata gp vdi
 
 	let clone ctx gp driver_params sr vdi =
-		info "API call: VDI.clone sr=%s vdi_location=%s driver_params=[%s]" sr.sr_uuid vdi.vdi_location (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) driver_params));
+		info "API call: VDI.clone sr=%s vdi=%s driver_params=[%s]" sr vdi (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) driver_params));
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.clone ctx metadata gp vdi
 
 	let resize ctx gp sr vdi newsize =
-		info "API call: VDI.resize sr=%s vdi_location=%s newsize=%Ld" sr.sr_uuid vdi.vdi_location newsize;
+		info "API call: VDI.resize sr=%s vdi=%s newsize=%Ld" sr vdi newsize;
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.resize ctx metadata gp vdi newsize
 
 	let resize_online ctx gp sr vdi newsize =
-		info "API call: VDI.resize_online sr=%s vdi_location=%s newsize=%Ld" sr.sr_uuid vdi.vdi_location newsize;
+		info "API call: VDI.resize_online sr=%s vdi=%s newsize=%Ld" sr vdi newsize;
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.resize ctx metadata gp vdi newsize
 
 	let attach ctx gp sr vdi writable =
-		info "API call: VDI.attach sr=%s vdi_location=%s writable=%b" sr.sr_uuid vdi.vdi_location writable;
+		info "API call: VDI.attach sr=%s vdi=%s writable=%b" sr vdi writable;
 		let metadata = Attachments.gsm sr in
 		VhdSlave.VDI.attach ctx metadata gp vdi writable
 
 	let detach ctx gp sr vdi =
-		info "API call: VDI.detach sr=%s vdi_location=%s" sr.sr_uuid vdi.vdi_location;
+		info "API call: VDI.detach sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gsm sr in
 		VhdSlave.VDI.detach ctx metadata gp vdi
 
 	let activate ctx gp sr vdi =
-		info "API call: VDI.activate sr=%s vdi_location=%s" sr.sr_uuid vdi.vdi_location;
+		info "API call: VDI.activate sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gsm sr in
 		VhdSlave.VDI.activate ctx metadata gp vdi
 
 	let deactivate ctx gp sr vdi =
-		info "API call: VDI.deactivate sr=%s vdi_location=%s" sr.sr_uuid vdi.vdi_location;
+		info "API call: VDI.deactivate sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gsm sr in
 		VhdSlave.VDI.deactivate ctx metadata gp vdi
 
 	let generate_config ctx gp sr vdi = 
-		info "API call: VDI.generate_config sr=%s vdi_location=%s" sr.sr_uuid vdi.vdi_location;
+		info "API call: VDI.generate_config sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gsm sr in
 		VhdSlave.VDI.generate_config ctx metadata gp vdi
 
@@ -399,44 +400,44 @@ module VDI = struct
 		VhdMaster.VDI.leaf_coalesce ctx metadata gp vdi
 
 	let slave_attach ctx host sr_uuid id writable is_reattach =
-		let metadata = Attachments.gmm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.slave_attach ctx metadata host id writable is_reattach
 
 	let get_slave_attach_info ctx sr_uuid id =
-		let metadata = Attachments.gmm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.get_slave_attach_info ctx metadata id 
 
 	let slave_detach ctx host sr_uuid id =
-		let metadata = Attachments.gmm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.slave_detach ctx metadata host id
 
 	let slave_activate ctx host sr_uuid id is_reactivate =
-		let metadata = Attachments.gmm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.slave_activate ctx metadata host id is_reactivate
 
 	let slave_deactivate ctx host sr_uuid id =
-		let metadata = Attachments.gmm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.slave_deactivate ctx metadata host id
 
 	let slave_reload ctx sr_uuid ids =
-		let metadata = Attachments.gsm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gsm sr_uuid in
 		VhdSlave.VDI.slave_reload ctx metadata ids
 
 	let slave_leaf_coalesce_stop_and_copy ctx sr_uuid id leaf_path new_leaf_path =
-		let metadata = Attachments.gsm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gsm sr_uuid in
 		VhdSlave.VDI.slave_leaf_coalesce_stop_and_copy ctx metadata id leaf_path new_leaf_path
 
 	let external_clone ctx sr_uuid filename =
-		let metadata = Attachments.gmm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.external_clone ctx metadata filename
 
 	let slave_set_phys_size ctx sr_uuid id size =
-		let metadata = Attachments.gsm {sr_uuid=sr_uuid } in
+		let metadata = Attachments.gsm sr_uuid in
 		VhdSlave.VDI.slave_set_phys_size ctx metadata id size
 
 	let thin_provision_request_more_space ctx sr_uuid host dmnaps =
 		debug "sr_uuid=%s" sr_uuid;
-		let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.thin_provision_request_more_space ctx metadata host dmnaps
 
 	let attach_from_config ctx gp sr vdi config =
@@ -469,7 +470,7 @@ end
 
 module Debug = struct
 	let vdi_get_leaf_path context sr_uuid id =
-		let metadata = Attachments.gsm {sr_uuid=sr_uuid} in
+		let metadata = Attachments.gsm sr_uuid in
 		Nmutex.execute context metadata.Vhd_types.s_mutex "Getting leaf path"
 			(fun () ->
 				let savi = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis id in

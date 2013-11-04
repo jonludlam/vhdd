@@ -1,5 +1,4 @@
 (* Internal handler *)
-open Smapi_types
 open Int_rpc
 open Int_types
 open Threadext
@@ -74,36 +73,36 @@ let process ctx call =
 				| Debug_waiting_mode_set mode ->
 					let () = Nmutex.set_waiting_mode mode in Nil
 				| Debug_get_id_to_leaf_map sr_uuid ->
-					  let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gmm sr_uuid in
 					  let hashtbl = Mutex.execute metadata.Vhd_types.m_id_mapping_lock.Nmutex.m (fun () ->
 						  Hashtbl.copy metadata.Vhd_types.m_data.Vhd_types.m_id_to_leaf_mapping) in
 					  Id_to_leaf_map (Vhd_types.rpc_of_id_to_leaf_mapping_t hashtbl)
 				| Debug_get_vhds sr_uuid ->
-					  let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gmm sr_uuid in
 					  let rpc = Vhd_records.get_vhd_records_rpc metadata.Vhd_types.m_data.Vhd_types.m_vhds in
 					  Vhds rpc
 				| Debug_get_attached_vdis sr_uuid ->
-					  let metadata = Attachments.gsm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gsm sr_uuid in
 					  let hashtbl = Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () ->
 						  Hashtbl.copy metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis) in
 					  Attached_vdis (Vhd_types.rpc_of_attached_vdis_t hashtbl)
 				| Debug_get_master_metadata sr_uuid ->
-					  let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gmm sr_uuid in
 					  Master_metadata (Vhd_types.rpc_of_master_sr_metadata_data metadata.Vhd_types.m_data)
 				| Debug_get_slave_metadata sr_uuid ->
-					  let metadata = Attachments.gsm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gsm sr_uuid in
 					  Slave_metadata (Vhd_types.rpc_of_slave_sr_metadata_data metadata.Vhd_types.s_data)
 				| Debug_get_vhd_container sr_uuid ->
-					  let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gmm sr_uuid in
 					  let container = metadata.Vhd_types.m_data.Vhd_types.m_vhd_container in
 					  Vhd_container (Lvmabs_types.rpc_of_container_info container)
 				| Debug_get_pid ->
 					  Vhdd_pid (Unix.getpid ())
 				| Debug_get_attach_finished sr_uuid ->
-					  let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gmm sr_uuid in
 					  Attach_finished metadata.Vhd_types.m_data.Vhd_types.m_attach_finished
 				| Debug_slave_get_leaf_vhduid (sr_uuid,id) ->
-					  let metadata = Attachments.gsm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gsm sr_uuid in
 					  Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () ->
 						  let v = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis id in
 						  let leaf_path = v.Vhd_types.savi_attach_info.Int_types.sa_leaf_path in
@@ -113,14 +112,14 @@ let process ctx call =
 						  Vhduid vhduid)
 				| Debug_write_junk (sr_uuid, id, size, n, current_junk) ->
 					  debug "Writing junk";
-					  let metadata = Attachments.gsm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gsm sr_uuid in
 					  Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () -> 
 						  let v = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis id in
 						  let path = v.Vhd_types.savi_endpoint in
 						  if !Global.dummy then Junk [] else Junk (Debug_utils.write_junk path size n current_junk))
 				| Debug_check_junk (sr_uuid, id, junk) ->
 					  debug "Checking junk";
-					  let metadata = Attachments.gsm {sr_uuid=sr_uuid} in
+					  let metadata = Attachments.gsm sr_uuid in
 					  Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () -> 
 						  let v = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis id in
 						  let path = v.Vhd_types.savi_endpoint in
@@ -146,7 +145,7 @@ let process ctx call =
 			Failure ("INTERNAL_ERROR",[Printexc.to_string e])
 
 let local_rpc task_id call =
-	let context = {c_driver="unknown"; c_api_call=""; c_task_id=task_id; c_other_info=[]} in
+	let context = Context.({c_driver="unknown"; c_api_call=""; c_task_id=task_id; c_other_info=[]}) in
 	debug "Got internal call: %s" (Jsonrpc.to_string call);
 	Int_rpc.rpc_of_intrpc_response_wrapper (process context (Int_rpc.intrpc_of_rpc call))
 

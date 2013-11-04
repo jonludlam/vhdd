@@ -201,7 +201,7 @@ let status context =
 		div ~attrs:["class",Some "attached_as_slave"] (Attachments.map_slave_srs (fun k v -> slave_to_html k v));
 	]] ()
 
-let dot_handler req fd =
+let dot_handler req fd () =
 	req.Http.Request.close <- true;
 	let context = {
 		c_driver="none";
@@ -213,7 +213,7 @@ let dot_handler req fd =
 	let path = String.split '/' req.Http.Request.uri in
 	match path with
 		| ""::"dot"::[sr_uuid] ->
-			let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+			let metadata = Attachments.gmm sr_uuid in
 			let dot = Dot.to_string context metadata in
 			let tmp = Filenameext.temp_file_in_dir "/tmp/foo" in
 			Unixext.write_string_to_file tmp dot;
@@ -222,7 +222,7 @@ let dot_handler req fd =
 		| _ ->
 			failwith "Bad request"
 
-let wait_handler req fd =
+let wait_handler req fd () =
 	req.Http.Request.close <- true;
 	let path = String.split '/' req.Http.Request.uri in
 	match path with
@@ -231,7 +231,7 @@ let wait_handler req fd =
 			Http_svr.response_str req fd "OK"
 		| _ -> failwith "Bad request"
 
-let status_handler req fd =
+let status_handler req fd () =
 	oddrow := true;
 	req.Http.Request.close <- true;
 	let context = {
@@ -261,7 +261,7 @@ let signal_slave_metadata_change metadata () =
 		incr global_id;
 		Condition.broadcast metadata_change_condition)
 
-let update_handler req fd =
+let update_handler req fd () =
 	req.Http.Request.close <- true;
 	let id = int_of_string (List.assoc "id" req.Http.Request.query) in
 	let get_updates () =

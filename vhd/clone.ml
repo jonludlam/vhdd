@@ -13,7 +13,7 @@ let syslog s =
 
 
 let clone context metadata generic_params vdi new_reservation_override =
-	let id = vdi.vdi_location in
+	let id = vdi in
 	Locking.with_clone_lock context metadata id
 		(fun leaf_info ->
 			(* Note - we disallow attach/detach/activate/deactivate while an operation is
@@ -85,6 +85,4 @@ let clone context metadata generic_params vdi new_reservation_override =
 
 			Id_map.add_to_id_map context metadata new_id2 (PVhd vhd2.vhduid) new_reservation_override;
 
-			let clone_uuid = Xapi.create_vdi generic_params new_id2 new_vsize lvsize2 in
-
-			{vdi_uuid = Some clone_uuid; vdi_location = new_id2})
+			new_id2)
