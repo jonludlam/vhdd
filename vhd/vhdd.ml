@@ -6,6 +6,8 @@ open D
 
 let server = Http_svr.Server.empty ()
 
+module S = Storage_interface.Server(Vhdsm)
+
 let read_body req fd =
 	let len = match req.Http.Request.content_length with Some x -> x | None -> failwith "Need a content length" in
 	Unixext.really_read_string fd (Int64.to_int len)

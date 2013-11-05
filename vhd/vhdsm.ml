@@ -5,38 +5,52 @@ open Threadext
 open Stringext
 open Storage_interface
 
+type context = Context.t
+
 module D = Debug.Make(struct let name="vhdsm" end)
 open D
 
+module DP = struct include Storage_skeleton.DP end
+
+module Query = struct
+  let query ctx ~dbg =
+    let open Context in
+    { driver = ctx.c_driver;
+      name = ctx.c_driver;
+      description = "Daemonized VHD SR";
+      vendor = "Ring 3";
+      copyright = "Citrix";
+      version = "2";
+      required_api_version = "1.1";
+      features = [
+	"SR_PROBE";
+	"SR_UPDATE";
+	"VDI_CREATE";
+	"VDI_DELETE";
+	"VDI_ATTACH";
+	"VDI_DETACH";
+	"VDI_RESIZE";
+	"VDI_RESIZE_ONLINE";
+	"VDI_CLONE";
+	"VDI_SNAPSHOT";
+	"VDI_ACTIVATE";
+	"VDI_DEACTIVATE";
+	"VDI_UPDATE";
+	"VDI_INTRODUCE";
+      ] @ (if Drivers.supports_ha ctx.c_driver then ["VDI_GENERATE_CONFIG"] else []);
+      configuration = Drivers.get_driver_config ctx.c_driver;
+    }
+    let diagnostics ctx ~dbg = "Not available"
+  end
+
+module UPDATES = struct include Storage_skeleton.UPDATES end
+module TASK = struct include Storage_skeleton.TASK end
+module Policy = struct include Storage_skeleton.Policy end
+module DATA = struct include Storage_skeleton.DATA end
+let get_by_name = Storage_skeleton.get_by_name
+
 module SR = struct
 	(* TODO: return more interesting configuration information *)
-	let get_driver_info ctx =
-	        let open Context in
-		{ driver = ctx.c_driver;
-		  name = ctx.c_driver;
-		  description = "Daemonized VHD SR";
-		  vendor = "Ring 3";
-		  copyright = "Citrix";
-		  version = "2";
-		  required_api_version = "1.1";
-		  features = [
-			"SR_PROBE";
-			"SR_UPDATE";
-			"VDI_CREATE";
-			"VDI_DELETE";
-			"VDI_ATTACH";
-			"VDI_DETACH";
-			"VDI_RESIZE";
-			"VDI_RESIZE_ONLINE";
-			"VDI_CLONE";
-			"VDI_SNAPSHOT";
-			"VDI_ACTIVATE";
-			"VDI_DEACTIVATE";
-			"VDI_UPDATE";
-			"VDI_INTRODUCE";
-		] @ (if Drivers.supports_ha ctx.c_driver then ["VDI_GENERATE_CONFIG"] else []);
-		configuration = Drivers.get_driver_config ctx.c_driver;
-		}
 
 	let probe ctx gp sr_sm_config =
 		let driver = Drivers.of_ctx ctx in
@@ -299,7 +313,7 @@ module SR = struct
 		let driver = Drivers.of_ctx ctx in
 		Transport.detach driver sr generic_params
 
-	let delete ctx gp sr = 
+	let destroy ctx gp sr = 
 		(* If we're attached, detach: *)
 		let metadata = try Some (Attachments.gsm sr) with _ -> None in
 		(match metadata with
@@ -327,6 +341,25 @@ module SR = struct
 
 	(* Part of the infrastructure to support thin provisioning *)
 	let thin_provision_check ctx sr = VhdSlave.SR.thin_provision_check ctx (Attachments.gsm sr)
+
+	let list ~dbg =
+	  let m_srs = Attachments.map_master_srs (fun k v -> k) in
+	  let s_srs = Attachments.map_master_srs (fun k v -> k) in
+	  let all = m_srs @ s_srs in
+	  Listext.List.setify all
+
+	let reset ~dbg ~sr =
+	  ()
+
+	let update_snapshot_info_src ~dbg ~sr ~vdi ~url ~dest ~dest_vdi ~snapshot_pairs =
+	  failwith "Unimplemented"
+
+	let update_snapshot_info_dest ~dbg ~sr ~vdi ~src_vdi ~snapshot_pairs = 
+	  failwith "Unimplemented"
+
+	let stat ~dbg ~sr =
+	  { total_space = 0L;
+	    free_space = 0L; }
 end
 
 module VDI = struct
