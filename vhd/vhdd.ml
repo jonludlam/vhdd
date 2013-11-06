@@ -273,7 +273,14 @@ let _ =
 
 	Lvm.Lvmdebug.debug_hook := Some MLVMDebug.debug;
 
-	Vhdrpc.local_rpc := Int_server.local_rpc;
+
+	let queue_name = "org.xen.xcp.storage.local" in
+
+	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
+	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="local"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
+	Xcp_service.serve_forever service
+
+(*	Vhdrpc.local_rpc := Int_server.local_rpc;
 
 	if not !Global.nodaemon then (Unixext.daemonize ());
 
@@ -283,4 +290,4 @@ let _ =
 
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
-	watchdog server_init
+	watchdog server_init*)

@@ -115,47 +115,48 @@ module VDI = struct
 			exec_cleanup_funcs ();
 			raise e
 				
-	let attach context metadata generic_params vdi writable =
-		let id = vdi in
-		fix_ctx context (Some id);
+	let attach context metadata vdi writable =
+	  let id = vdi in
+	  fix_ctx context (Some id);
 
-		if metadata.s_data.s_master = None then 
-			failwith "Can't attach a VDI without a master set";
+	  if metadata.s_data.s_master = None then 
+	    failwith "Can't attach a VDI without a master set";
 
-		let host_uuid = Global.get_host_uuid () in
-		let sr_uuid = metadata.s_data.s_sr in
+	  let host_uuid = Global.get_host_uuid () in
+	  let sr_uuid = metadata.s_data.s_sr in
 
-		with_op context metadata id Attaching (fun () ->
-			let current = Nmutex.execute context metadata.s_mutex "Finding whether we're already attached"
-				(fun () ->
-					try
-						let current = Hashtbl.find metadata.s_data.s_attached_vdis id in
-						Some current
-					with _ ->
-						None)
-			in
+	  let params = with_op context metadata id Attaching (fun () ->
+	    let current = Nmutex.execute context metadata.s_mutex "Finding whether we're already attached"
+	      (fun () ->
+		try
+		  let current = Hashtbl.find metadata.s_data.s_attached_vdis id in
+		  Some current
+		with _ ->
+		  None)
+	    in
 
-			match current with
-				| None ->
-					let slave_attach_info = 
-						Int_client_utils.slave_retry_loop context [e_unknown_location] (fun rpc -> 
-							Int_client.Vdi.slave_attach rpc host_uuid sr_uuid id writable false) metadata in
-					debug "Got response: leaf=%s" slave_attach_info.sa_leaf_path;
-					
-					with_master_approved_op context metadata id Attaching (fun () -> 
-						try 
-							commit_slave_attach_info_to_disk sr_uuid id slave_attach_info;
-							attach_from_sai context metadata id slave_attach_info
-						with e ->
-							log_backtrace ();
-							error "Caught exception while attaching: %s" (Printexc.to_string e);
-							remove_slave_attach_info_from_disk sr_uuid id;
-							Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-								Int_client.Vdi.slave_detach rpc host_uuid sr_uuid id) metadata;
-							error "Issued slave_detach";
-							raise e)
-				| Some current ->
-					current.savi_endpoint)
+	    match current with
+	    | None ->
+	      let slave_attach_info = 
+		Int_client_utils.slave_retry_loop context [e_unknown_location] (fun rpc -> 
+		  Int_client.Vdi.slave_attach rpc host_uuid sr_uuid id writable false) metadata in
+	      debug "Got response: leaf=%s" slave_attach_info.sa_leaf_path;
+	      
+	      with_master_approved_op context metadata id Attaching (fun () -> 
+		try 
+		  commit_slave_attach_info_to_disk sr_uuid id slave_attach_info;
+		  attach_from_sai context metadata id slave_attach_info
+		with e ->
+		  log_backtrace ();
+		  error "Caught exception while attaching: %s" (Printexc.to_string e);
+		  remove_slave_attach_info_from_disk sr_uuid id;
+		  Int_client_utils.slave_retry_loop context [] (fun rpc -> 
+		    Int_client.Vdi.slave_detach rpc host_uuid sr_uuid id) metadata;
+		  error "Issued slave_detach";
+		  raise e)
+	    | Some current ->
+	      current.savi_endpoint) in
+	  Storage_interface.({params; xenstore_data=[]})
 
 	let unpause sr_uuid id savi =
 		if savi.savi_activated then begin
@@ -281,7 +282,7 @@ module VDI = struct
 			
 			reattach_from_sai context metadata vdi sai)
 
-	let detach context metadata generic_params vdi =
+	let detach context metadata vdi =
 		let id = vdi in
 		fix_ctx context (Some id);
 		(* Nb. tapdisk _should_ be already dead at this point *)
@@ -363,7 +364,7 @@ module VDI = struct
 			Html.signal_slave_metadata_change metadata ();
 		)
 
-	let activate context metadata generic_params vdi =
+	let activate context metadata vdi =
 		let id = vdi in
 		fix_ctx context (Some id);
 
@@ -394,7 +395,7 @@ module VDI = struct
 						raise e)
 			end)
 
-	let deactivate context metadata generic_params vdi =
+	let deactivate context metadata vdi =
 		let id = vdi in
 		fix_ctx context (Some id);
 
@@ -502,7 +503,7 @@ module VDI = struct
 		else
 			()
 
-	let generate_config context metadata generic_params vdi =
+	let generate_config context metadata device_config vdi =
 		let id = vdi in
 		fix_ctx context (Some id);
 		let sr_uuid = metadata.s_data.s_sr in
@@ -511,11 +512,11 @@ module VDI = struct
 
 				Int_client.Vdi.get_slave_attach_info rpc sr_uuid id) metadata in
 		let arg = Jsonrpc.to_string (rpc_of_slave_attach_info slave_attach_info) in
-(*		let call = Smapi_client.make_call ~vdi_location:id generic_params (Some metadata.s_data.s_sr) "vdi_attach_from_config" [ arg ] in
+(*		let call = Smapi_client.make_call ~vdi_location:id device_config (Some metadata.s_data.s_sr) "vdi_attach_from_config" [ arg ] in
 		let str = Xml.to_string (Smapi_client.xmlrpc_of_call call) in
 		str*) ""
 
-	let attach_and_activate_from_config context metadata generic_params vdi slave_attach_info =
+	let attach_and_activate_from_config context metadata device_config vdi slave_attach_info =
 		let id = vdi in
 		fix_ctx context (Some id);
 
@@ -533,13 +534,12 @@ module VDI = struct
 				| None ->
 					let endpoint = attach_from_sai context metadata id slave_attach_info in
 					activate_unsafe context metadata id;
-					endpoint
+					Storage_interface.({params=endpoint; xenstore_data=[]})
 
 				| Some savi -> 
 					if not savi.savi_activated 
 					then activate_unsafe context metadata id; 
-
-					savi.savi_endpoint)
+					Storage_interface.({params=savi.savi_endpoint; xenstore_data=[]}))
 			
 end
 
@@ -683,10 +683,10 @@ module SR = struct
 		Tracelog.append context (Tracelog.Slave_s_ready true) None;
 		Html.signal_slave_metadata_change metadata ()
 
-	let assert_can_detach context metadata generic_params =
+	let assert_can_detach context metadata device_config =
 		assert(Hashtbl.length metadata.s_data.s_attached_vdis = 0)
 
-	let detach context metadata generic_params =
+	let detach context metadata device_config =
 		()
 
 	let slave_recover context metadata tok master =
@@ -704,7 +704,7 @@ module SR = struct
 			with e ->
 				log_backtrace ();
 				warn "Error: caught exception while reattaching VDI: Detaching! (%s)" (Printexc.to_string e);
-				VDI.detach context metadata {gp_device_config=[]; gp_sr_sm_config=[]} k
+				VDI.detach context metadata k
 		) currently_attached;
 		let has_master_changed = 
 			match metadata.s_data.s_master with 

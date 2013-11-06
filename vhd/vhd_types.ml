@@ -22,11 +22,6 @@ type operation_ty =
 	| OpReattaching
 with rpc
 
-type generic_params = {
-  gp_device_config : (string * string) list;
-  gp_sr_sm_config : (string * string) list;
-} with rpc
-    
 module MasterOperations = struct
   type operation = operation_ty
 

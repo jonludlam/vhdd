@@ -58,7 +58,7 @@ let pool_secret = ref None
 let get_pool_secret () =
 	match !pool_secret with
 		| None ->
-			let p = Unixext.string_of_file "/etc/xensource/ptoken" in
+			let p = Unixext.string_of_file "/etc/xcp/ptoken" in
 			(*pool_secret := Some p; *)
 			p
 		| Some p -> p

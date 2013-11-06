@@ -7,6 +7,7 @@ open Threadext
 open Listext
 open Coalesce
 open Vhd_records
+open Storage_interface
 
 module D=Debug.Make(struct let name="vhdmaster" end)
 open D
@@ -73,7 +74,10 @@ module VDI = struct
 	let thin_provision_request_more_space context metadata host ids_and_physsizes =
 		failwith "Not implemented"
 
-	let create context metadata generic_params sm_config virtual_size =
+	let create context metadata vdi_info =
+	  let virtual_size = vdi_info.virtual_size in
+	  let sm_config = vdi_info.sm_config in
+
 		fix_ctx context None;
 		let location_uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 
@@ -134,7 +138,13 @@ module VDI = struct
 
 		Id_map.add_to_id_map context metadata id ptr None;
 
-		id
+		{vdi_info with vdi=id;
+		  is_a_snapshot=false;
+		  snapshot_time="";
+		  snapshot_of="";
+		  read_only=false;
+		  physical_utilisation=0L;
+		}
 
 	let update context metadata gp vdi =
 		let id = vdi in
@@ -145,7 +155,7 @@ module VDI = struct
 						
 					
 
-	let introduce context metadata generic_params uuid sm_config id =
+	let introduce context metadata device_config uuid sm_config id =
 		let leaf_info=Master_helpers.safe_get_leaf_info context metadata id in
 		let ptr = leaf_info.leaf in
 		match ptr with
@@ -157,7 +167,7 @@ module VDI = struct
 			| PRaw x ->
 				failwith "Not implemented"
 
-	let delete context metadata gp vdi =
+	let delete context metadata vdi =
 		let id = vdi in
 		fix_ctx context (Some id);
 		check_all_hosts_present context metadata;
@@ -190,8 +200,8 @@ module VDI = struct
 	exception Parent_missing
 
 
-	let clone_inner new_reservation_override context metadata generic_params vdi =
-		let id = vdi in
+	let clone_inner new_reservation_override context metadata vdi =
+		let id = vdi.Storage_interface.vdi in
 		fix_ctx context (Some id);
 
 		if metadata.m_data.m_rolling_upgrade then 
@@ -200,14 +210,29 @@ module VDI = struct
 		check_all_hosts_present context metadata;
 		debug "OK";
 
-		let result = Clone.clone context metadata generic_params vdi new_reservation_override in
+		let result = Clone.clone context metadata id new_reservation_override in
 		result
 
-	let clone context metadata generic_params vdi = clone_inner None context metadata generic_params vdi
+	let clone context metadata vdi = 
+	  let new_id = clone_inner None context metadata vdi in
+	  {vdi with 
+	    vdi=new_id;
+	    is_a_snapshot=false;
+	    snapshot_time="";
+	    snapshot_of="";
+	    physical_utilisation=0L }
 
-	let snapshot context metadata generic_params vdi = clone_inner (Some Vhdutil.Attach) context metadata generic_params vdi
+	let snapshot context metadata vdi = 
+	  let new_id = clone_inner (Some Vhdutil.Attach) context metadata vdi in
+	  {vdi with
+	    vdi=new_id;
+	    is_a_snapshot=true;
+	    snapshot_time="now";
+	    snapshot_of=vdi.vdi;
+	    physical_utilisation=0L}
 
-	let resize context metadata gp vdi newsize =
+
+	let resize context metadata vdi newsize =
 		let id = vdi in
 		fix_ctx context (Some id);
 		let vsize = Vhdutil.roundup newsize Lvm.Constants.extent_size in
@@ -235,16 +260,16 @@ module VDI = struct
 						
 		Master_utils.reattach context metadata id;
 
-		id
+		newsize
 
-	let resize_online ctx metadata gp vdi newsize =
-		resize ctx metadata gp vdi newsize
+	let resize_online ctx metadata vdi newsize =
+		resize ctx metadata vdi newsize
 
 	let do_leaf_coalesce context metadata id =
 		fix_ctx context (Some id);
 		Leaf_coalesce.leaf_coalesce context metadata id
 
-	let leaf_coalesce context metadata generic_params vdi =
+	let leaf_coalesce context metadata device_config vdi =
 		let id = vdi in
 		fix_ctx context (Some id);
 		(* Grab the coalesce lock first *)
@@ -287,11 +312,10 @@ end
 	   done as part of the post-slave-recover sync.
 	*)
 
-	let attach context generic_params driver path sr =
+	let attach context device_config driver path sr =
 		fix_ctx context None;
-		debug "sr_sm_config: [%s]" (String.concat ";" (List.map (fun (k,v) -> Printf.sprintf "(%s,%s)" k v) generic_params.gp_sr_sm_config));
 
-		let m_rolling_upgrade = List.mem_assoc "rolling_upgrade_mode" generic_params.gp_sr_sm_config in
+		let m_rolling_upgrade = List.mem_assoc "rolling_upgrade_mode" device_config in
 		debug "m_rolling_upgrade=%b" m_rolling_upgrade;
 
 		let check container =
@@ -385,7 +409,7 @@ end
 				| File _ -> None
 				| _ ->
 					try
-						match List.assoc "reservation_mode" generic_params.gp_device_config with
+						match List.assoc "reservation_mode" device_config with
 							| "thin" -> Some Vhdutil.Thin
 							| "leaf" -> Some Vhdutil.Leaf
 							| "attach" -> Some Vhdutil.Attach
@@ -498,16 +522,16 @@ end
 						Nmutex.condition_broadcast context metadata.m_attached_hosts_condition);
 				) metadata ssa.ssa_host) ())) need_resync
 
-	let assert_can_detach context metadata generic_params =
+	let assert_can_detach context metadata device_config =
 		if metadata.m_data.m_attach_finished <> true then 
 			failwith "Can't detach when not finished attaching"
 
-	let detach context metadata generic_params =
+	let detach context metadata device_config =
 		fix_ctx context None;
 		Slave_sr_attachments.commit_attached_hosts_to_disk context metadata None; (* Commit to detaching! *)
 		Lvmabs.shutdown context metadata.m_data.m_vhd_container
 
-	let create context driver path generic_params sr size =
+	let create context driver path device_config sr size =
 		fix_ctx context None;
 		match driver with
 			| Drivers.Lvm _ ->
@@ -523,10 +547,10 @@ end
 			| Drivers.File _ ->
 				()
 
-	let delete context metadata generic_params sr path = failwith "Implemented elsewhere"			
+	let delete context metadata device_config sr path = failwith "Implemented elsewhere"			
 
 	(* The probe here is only run once the transport has been attached *)
-	let probe context driver generic_params sr_sm_config path =
+	let probe context driver device_config sr_sm_config path =
 		fix_ctx context None;
 		match driver with
 			| Lvm _ ->
@@ -590,9 +614,10 @@ end
 				List.map (fun f -> Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData f])])) srs)
 
 	(* TODO: Fix up xapi's database. This currently only kicks off the coalesce process *)
-	let scan context driver generic_params sr =
+	let scan context driver sr =
 		fix_ctx context None;
 		let metadata = Attachments.gmm sr in
+		let device_config = Attachments.((get_sr_info sr).device_config) in
 		if not metadata.m_data.m_rolling_upgrade then begin
 			Coalesce.with_coalesce_lock context metadata (fun () -> 
 				let contents = classify_sr_contents context metadata in
@@ -612,11 +637,10 @@ end
 					ignore(Locking.with_container_write_lock context metadata (fun container -> (Lvmabs.remove context container vhd.location, ())))) contents.unreachable_vhds;
 				List.iter (fun vdi -> try ignore(VDI.do_leaf_coalesce context metadata vdi) with Leaf_coalesce.Cant_leaf_coalesce _ -> ()) contents.leaf_coalescable_ids)
 		end;
-
-		""
+		[]
 
 	(*    let sr = match metadata.m_sr.sr_ref with Some r -> r | None -> failwith "Need SR ref!" in
-		  let session = generic_params.session_ref in
+		  let session = device_config.session_ref in
 		  let vdis = Client.VDI.get_all_records ~rpc:xapirpc ~session_id:session in
 		  let sr_vdis = List.filter (fun (vdi,vdir) -> vdir.API.vDI_SR=sr) vdis in
 		  Hashtbl.iter (fun vhduid vhdr ->
@@ -628,7 +652,7 @@ end
 		  ~sR:sr ~_type:`user ~sharable:false ~read_only:(not vhdr.is_leaf) ~other_config:[] ~location:vhdr.vhduid
 		  ~xenstore_data:[] ~sm_config:[]) end) metadata.vhds*)
 
-	let update context driver gp sr = 
+	let update context driver sr = 
 		fix_ctx context None;
 		let metadata = Attachments.gmm sr in
 		()

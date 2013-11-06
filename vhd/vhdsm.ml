@@ -57,7 +57,7 @@ module SR = struct
 		Transport.probe driver gp (fun path ->
 			VhdMaster.SR.probe ctx driver gp sr_sm_config path)
 
-	let create ctx gp sr size =
+	let create ctx ~dbg ~sr ~device_config ~physical_size =
 		(* Fail if we've already got an SR with the same uuid attached *)
 		let exists = (try Attachments.gmm sr; true with _ -> false) || (try Attachments.gsm sr; true with _ -> false) in
 
@@ -65,15 +65,15 @@ module SR = struct
 
 		let driver = Drivers.of_ctx ctx in
  		try
-			let path = Transport.attach driver sr gp true in
-			VhdMaster.SR.create ctx driver path gp sr size;
-			Transport.detach driver sr gp;
+			let path = Transport.attach driver sr device_config true in
+			VhdMaster.SR.create ctx driver path device_config sr physical_size;
+			Transport.detach driver sr device_config;
 		with Transport.MissingParam name ->
 		        raise (Missing_configuration_parameter name)
 
-	let scan ctx gp sr = VhdMaster.SR.scan ctx (Drivers.of_ctx ctx) gp sr
+	let scan ctx ~dbg ~sr = VhdMaster.SR.scan ctx (Drivers.of_ctx ctx) sr
 
-	let update ctx gp sr = VhdMaster.SR.update ctx (Drivers.of_ctx ctx) gp sr
+	let update ctx sr = VhdMaster.SR.update ctx (Drivers.of_ctx ctx) sr
 
 	let mode ctx sr_uuid =
 		let sr = sr_uuid in
@@ -104,13 +104,13 @@ module SR = struct
 	   VDIs to sync up their metadata. Once the attachment is
 	   complete, we perform resync operations (recover_slaves and
 	   slave_recover) *)
-	let attach_in_mode ctx generic_params path sr mode is_reattach =
+	let attach_in_mode ctx device_config path sr mode is_reattach =
 		let driver = Drivers.of_ctx ctx in
 		let slave_conf = Attachments.gsm sr in
 		begin
 			match mode with
 				| Master ->
-					let master_conf = VhdMaster.SR.attach ctx generic_params driver path sr in
+					let master_conf = VhdMaster.SR.attach ctx device_config driver path sr in
 					Attachments.attach_as_master sr master_conf;
 					Html.signal_master_metadata_change master_conf ();
 
@@ -146,7 +146,7 @@ module SR = struct
 			path=path;
 			uuid=sr;
 			mode=mode;
-			device_config=generic_params.Vhd_types.gp_device_config}
+			device_config}
 
 
 	(* The attach function first attaches the underlying block device via
@@ -168,7 +168,7 @@ module SR = struct
 
 	(* Ensures that the transport layer is attached, then calls the passed
 	   function with the path *)
-	let with_transport_path ctx generic_params sr f =
+	let with_transport_path ctx device_config sr f =
 		let driver = Drivers.of_ctx ctx in
 
 		(* Check if the transport layer is already attached *)
@@ -178,7 +178,7 @@ module SR = struct
 		match slave_metadata with
 			| Some s -> f s.Vhd_types.s_data.Vhd_types.s_path
 			| None ->
-				let path = Transport.attach driver sr generic_params false in
+				let path = Transport.attach driver sr device_config false in
 				try
 					(* If we've attached the transport, register any physical volumes
 					   that may be on the block device *)
@@ -200,25 +200,25 @@ module SR = struct
 						path=path;
 						uuid=sr;
 						mode=(Slave None);
-						device_config=generic_params.Vhd_types.gp_device_config};
+						device_config};
 					
 					(* Jump to the continuation *)
 					f slave_conf.Vhd_types.s_data.Vhd_types.s_path
 				with e ->
 					debug "Executing cleanup functions";
 					Host.remove_pv_id_info sr;
-					Transport.detach driver sr generic_params;
+					Transport.detach driver sr device_config;
 					raise e
 
 	(* Figure out whether we should be attaching in master or slave mode. If we're
 	   slave mode we need to figure out where the master is. This logic is in 
 	   master_probe *)
-	let determine_mode ctx generic_params sr path =
+	let determine_mode ctx device_config sr path =
 		let driver = Drivers.of_ctx ctx in
 		let mode =
 			try
-				if List.mem_assoc "SRmaster" generic_params.Vhd_types.gp_device_config &&
-					List.assoc "SRmaster" generic_params.Vhd_types.gp_device_config = "true" then
+				if List.mem_assoc "SRmaster" device_config &&
+					List.assoc "SRmaster" device_config = "true" then
 						Master
 				else
 					let host = Master_probe.master_probe ctx driver path sr in
@@ -236,10 +236,10 @@ module SR = struct
 				| Slave None -> Printf.sprintf "Slave nomaster");
 		mode
 
-	let attach ctx generic_params sr =
-		with_transport_path ctx generic_params sr (fun path ->
-			let mode = determine_mode ctx generic_params sr path in
-			attach_in_mode ctx generic_params path sr mode false)
+	let attach ctx ~dbg ~sr ~device_config =
+		with_transport_path ctx device_config sr (fun path ->
+			let mode = determine_mode ctx device_config sr path in
+			attach_in_mode ctx device_config path sr mode false)
 
 	let reattach sr =
 		let ctx = Context.({c_driver=sr.Attachments.drivertype; c_api_call="sr_attach"; c_task_id=Uuidm.to_string (Uuidm.create Uuidm.(`V4)); c_other_info=[]}) in
@@ -247,7 +247,6 @@ module SR = struct
 		let device_config = sr.Attachments.device_config in
 		let path = sr.Attachments.path in
 		let mode = sr.Attachments.mode in
-		let gp = Vhd_types.({gp_device_config=device_config; gp_sr_sm_config=[] }) in
 		let sr' = sr.Attachments.uuid in
 		maybe_add_pv_info ctx driver path sr';
 
@@ -257,7 +256,7 @@ module SR = struct
 			Html.signal_slave_metadata_change slave_conf ();
 			begin
 				try
-					attach_in_mode ctx gp path sr' mode true
+					attach_in_mode ctx device_config path sr' mode true
 				with
 					| VhdMaster.Other_master_detected m ->
 						(* It's pretty important that we reattach in any way we can, since we might
@@ -267,7 +266,7 @@ module SR = struct
 						   of sync if we do this. *)
 						begin
 							try
-								attach_in_mode ctx gp path sr' (Int_types.Slave (Some m)) true;
+								attach_in_mode ctx device_config path sr' (Int_types.Slave (Some m)) true;
 								Attachments.log_attachment_new_master sr.Attachments.uuid (Some m)
 							with e ->
 								log_backtrace ();
@@ -279,21 +278,24 @@ module SR = struct
 			error "Ack! Got an exception while reattaching. Please fix me! '%s'" (Printexc.to_string e);
 			log_backtrace ()
 
-	let attach_nomaster ctx generic_params sr =
-		with_transport_path ctx generic_params sr (fun path ->
+	let attach_nomaster ctx device_config sr =
+		with_transport_path ctx device_config sr (fun path ->
 			())
 
-	let detach ctx generic_params sr =
+	let detach ctx ~dbg ~sr =
 		let metadata = Attachments.gsm sr in
-		VhdSlave.SR.assert_can_detach ctx metadata generic_params;
+		let sr_info = Attachments.get_sr_info sr in
+		let device_config = sr_info.Attachments.device_config in
+		
+		VhdSlave.SR.assert_can_detach ctx metadata device_config;
 		let mm = try Some (Attachments.gmm sr) with _ -> None in
-		(match mm with | Some m -> VhdMaster.SR.assert_can_detach ctx m generic_params | _ -> ());
+		(match mm with | Some m -> VhdMaster.SR.assert_can_detach ctx m device_config | _ -> ());
 		(try
 			Attachments.log_detachment sr
 		with _ -> ());
 		(try
 			let metadata = Attachments.gsm sr in
-			VhdSlave.SR.detach ctx metadata generic_params;
+			VhdSlave.SR.detach ctx metadata device_config;
 			Attachments.detach_as_slave sr;
 			Html.signal_slave_metadata_change metadata ();
 		with _ -> ());
@@ -301,7 +303,7 @@ module SR = struct
 			let metadata = Attachments.gmm sr in
 			(* This is the point of no return *)
 			begin try 
-				VhdMaster.SR.detach ctx metadata generic_params;
+				VhdMaster.SR.detach ctx metadata device_config;
 			with e -> 
 				log_backtrace ();
 				debug "Caught exception: %s. Ignoring" (Printexc.to_string e)
@@ -311,20 +313,23 @@ module SR = struct
 		with _ -> ());
 		Host.remove_pv_id_info sr;
 		let driver = Drivers.of_ctx ctx in
-		Transport.detach driver sr generic_params
+		Transport.detach driver sr device_config
 
-	let destroy ctx gp sr = 
+	let destroy ctx ~dbg ~sr = 
 		(* If we're attached, detach: *)
 		let metadata = try Some (Attachments.gsm sr) with _ -> None in
+		let sr_info = Attachments.get_sr_info sr in
+		let device_config = sr_info.Attachments.device_config in
+
 		(match metadata with
-			| Some _ -> detach ctx gp sr;
+			| Some _ -> detach ctx ~dbg ~sr;
 			| None -> ());
 		(* Now we can delete *)
 		let driver = Drivers.of_ctx ctx in
-		let path = Transport.attach driver sr gp false in
-		Transport.delete driver sr gp path 
+		let path = Transport.attach driver sr device_config false in
+		Transport.delete driver sr device_config path 
 
-	let content_type ctx generic_params sr = "phy"
+	let content_type ctx device_config sr = "phy"
 
 	(* These are internal calls that occur as part of a SR.attach on a
 	   slave.  *)
@@ -342,86 +347,124 @@ module SR = struct
 	(* Part of the infrastructure to support thin provisioning *)
 	let thin_provision_check ctx sr = VhdSlave.SR.thin_provision_check ctx (Attachments.gsm sr)
 
-	let list ~dbg =
+	let list context ~dbg =
 	  let m_srs = Attachments.map_master_srs (fun k v -> k) in
 	  let s_srs = Attachments.map_master_srs (fun k v -> k) in
 	  let all = m_srs @ s_srs in
 	  Listext.List.setify all
 
-	let reset ~dbg ~sr =
+	let reset context ~dbg ~sr =
 	  ()
 
-	let update_snapshot_info_src ~dbg ~sr ~vdi ~url ~dest ~dest_vdi ~snapshot_pairs =
+	let update_snapshot_info_src ctx ~dbg ~sr ~vdi ~url ~dest ~dest_vdi ~snapshot_pairs =
 	  failwith "Unimplemented"
 
-	let update_snapshot_info_dest ~dbg ~sr ~vdi ~src_vdi ~snapshot_pairs = 
+	let update_snapshot_info_dest ctx ~dbg ~sr ~vdi ~src_vdi ~snapshot_pairs = 
 	  failwith "Unimplemented"
 
-	let stat ~dbg ~sr =
+	let stat ctx ~dbg ~sr =
 	  { total_space = 0L;
 	    free_space = 0L; }
 end
 
 module VDI = struct
-	let create ctx gp sr sm_config size =
+	let create ctx ~dbg ~sr ~vdi_info =
+	  let size = vdi_info.virtual_size in
+	  let sm_config = vdi_info.sm_config in
 		info "API call: VDI.create sr=%s size=%Ld sm_config=[%s]" sr size (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) sm_config));
 		let metadata = Attachments.gmm sr in
-		VhdMaster.VDI.create ctx metadata gp sm_config size
+		VhdMaster.VDI.create ctx metadata vdi_info
+
+	let add_to_sm_config ctx ~dbg ~sr ~vdi ~key ~value = 
+	  failwith "Unimplemented"
+
+	let remove_from_sm_config ctx ~dbg ~sr ~vdi ~key =
+	  failwith "Unimplemented"
+
+	let compose ctx ~dbg ~sr ~vdi1 ~vdi2 = 
+	  failwith "Unimplemented"
+
+	let set_content_id ctx ~dbg ~sr ~vdi ~content_id = 
+	  failwith "Unimplemented"
+
+	let get_by_name ctx ~dbg ~sr ~name =
+	  failwith "Unimplemented"
+
+	let similar_content ctx ~dbg ~sr ~vdi =
+	  failwith "Unimplemented"
+
+	let get_url ctx ~dbg ~sr ~vdi =
+	  failwith "Unimplemented"
+
+	let epoch_end ctx ~dbg ~sr ~vdi =
+	  failwith "Unimplemented"
+
+	let epoch_begin ctx ~dbg ~sr ~vdi =
+	  failwith "Unimplemented"
+
+	let set_persistent ctx ~dbg ~sr ~vdi ~persistent =
+	  failwith "Unimplemented"
+
+	let stat ctx ~dbg ~sr ~vdi =
+	  failwith "Unimplemented"
 
 	let update ctx gp sr vdi =
 		info "API call: VDI.update";
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.update ctx metadata gp vdi
 
+
+
 	let introduce ctx gp sr uuid sm_config location =
 		info "API call: VDI.introduce sr=%s uuid=%s location=%s sm_config=[%s]" sr uuid location (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) sm_config));
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.introduce ctx metadata gp uuid sm_config location
 
-	let delete ctx gp sr vdi =
+	let destroy ctx ~dbg ~sr ~vdi =
 		info "API call: VDI.delete sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gmm sr in
-		VhdMaster.VDI.delete ctx metadata gp vdi
+		VhdMaster.VDI.delete ctx metadata vdi
 
-	let snapshot ctx gp driver_params sr vdi =
-		info "API call: VDI.snapshot sr=%s vdi=%s driver_params=[%s]" sr vdi (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) driver_params));
-		let metadata = Attachments.gmm sr in
-		VhdMaster.VDI.snapshot ctx metadata gp vdi
+	let snapshot ctx ~dbg ~sr ~vdi_info =
+	  let vdi = vdi_info.vdi in
+	  info "API call: VDI.snapshot sr=%s vdi=%s" sr vdi_info.vdi ;
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.snapshot ctx metadata vdi_info
 
-	let clone ctx gp driver_params sr vdi =
-		info "API call: VDI.clone sr=%s vdi=%s driver_params=[%s]" sr vdi (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) driver_params));
-		let metadata = Attachments.gmm sr in
-		VhdMaster.VDI.clone ctx metadata gp vdi
+	let clone ctx ~dbg ~sr ~vdi_info =
+	  info "API call: VDI.clone sr=%s vdi=%s" sr vdi_info.vdi;
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.clone ctx metadata vdi_info
 
-	let resize ctx gp sr vdi newsize =
-		info "API call: VDI.resize sr=%s vdi=%s newsize=%Ld" sr vdi newsize;
+	let resize ctx ~dbg ~sr ~vdi ~new_size =
+		info "API call: VDI.resize sr=%s vdi=%s newsize=%Ld" sr vdi new_size;
 		let metadata = Attachments.gmm sr in
-		VhdMaster.VDI.resize ctx metadata gp vdi newsize
+		VhdMaster.VDI.resize ctx metadata vdi new_size
 
 	let resize_online ctx gp sr vdi newsize =
 		info "API call: VDI.resize_online sr=%s vdi=%s newsize=%Ld" sr vdi newsize;
 		let metadata = Attachments.gmm sr in
-		VhdMaster.VDI.resize ctx metadata gp vdi newsize
+		VhdMaster.VDI.resize ctx metadata vdi newsize
 
-	let attach ctx gp sr vdi writable =
-		info "API call: VDI.attach sr=%s vdi=%s writable=%b" sr vdi writable;
+	let attach ctx ~dbg ~dp ~sr ~vdi ~read_write =
+		info "API call: VDI.attach sr=%s vdi=%s writable=%b" sr vdi read_write;
 		let metadata = Attachments.gsm sr in
-		VhdSlave.VDI.attach ctx metadata gp vdi writable
+		VhdSlave.VDI.attach ctx metadata vdi read_write
 
-	let detach ctx gp sr vdi =
+	let detach ctx ~dbg ~dp ~sr ~vdi =
 		info "API call: VDI.detach sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gsm sr in
-		VhdSlave.VDI.detach ctx metadata gp vdi
+		VhdSlave.VDI.detach ctx metadata vdi
 
-	let activate ctx gp sr vdi =
+	let activate ctx ~dbg ~dp ~sr ~vdi =
 		info "API call: VDI.activate sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gsm sr in
-		VhdSlave.VDI.activate ctx metadata gp vdi
+		VhdSlave.VDI.activate ctx metadata vdi
 
-	let deactivate ctx gp sr vdi =
+	let deactivate ctx ~dbg ~dp ~sr ~vdi =
 		info "API call: VDI.deactivate sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gsm sr in
-		VhdSlave.VDI.deactivate ctx metadata gp vdi
+		VhdSlave.VDI.deactivate ctx metadata vdi
 
 	let generate_config ctx gp sr vdi = 
 		info "API call: VDI.generate_config sr=%s vdi=%s" sr vdi;
@@ -478,8 +521,8 @@ module VDI = struct
 
 		let metadata = Attachments.gsm sr in
 		if metadata.Vhd_types.s_data.Vhd_types.s_ready then begin
-			let result = VhdSlave.VDI.attach ctx metadata gp vdi true in (* Attach from config always attached RW *)
-			VhdSlave.VDI.activate ctx metadata gp vdi;
+			let result = VhdSlave.VDI.attach ctx metadata vdi true in (* Attach from config always attached RW *)
+			VhdSlave.VDI.activate ctx metadata vdi;
 			result
 		end else begin
 			let slave_attach_info = slave_attach_info_of_rpc (Jsonrpc.of_string config) in

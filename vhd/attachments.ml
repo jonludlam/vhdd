@@ -34,6 +34,15 @@ let read_attachments () =
 	in
 	sr_info_list_of_rpc (Jsonrpc.of_string a)
 
+let get_sr_info sr_uuid =
+  let attachments = read_attachments () in
+  try
+    List.find (fun sr -> sr.uuid = sr_uuid) attachments
+  with Not_found ->
+    error "Cannot find sr in list of attachments";
+    failwith "Cannot find sr in list of attachments"
+      
+
 let mutate_attachment_file f =
 	Mutex.execute mutex (fun () -> 
 		let srs = read_attachments () in

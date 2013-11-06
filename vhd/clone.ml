@@ -12,7 +12,7 @@ let syslog s =
 
 
 
-let clone context metadata generic_params vdi new_reservation_override =
+let clone context metadata vdi new_reservation_override =
 	let id = vdi in
 	Locking.with_clone_lock context metadata id
 		(fun leaf_info ->
