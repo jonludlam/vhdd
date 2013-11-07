@@ -59,7 +59,7 @@ module SR = struct
 
 	let create ctx ~dbg ~sr ~device_config ~physical_size =
 		(* Fail if we've already got an SR with the same uuid attached *)
-		let exists = (try Attachments.gmm sr; true with _ -> false) || (try Attachments.gsm sr; true with _ -> false) in
+		let exists = (try ignore(Attachments.gmm sr); true with _ -> false) || (try ignore(Attachments.gsm sr); true with _ -> false) in
 
 		if exists then failwith "An SR with the specified UUID is already attached";
 
@@ -380,10 +380,14 @@ module VDI = struct
 		VhdMaster.VDI.create ctx metadata vdi_info
 
 	let add_to_sm_config ctx ~dbg ~sr ~vdi ~key ~value = 
-	  failwith "Unimplemented"
+	  info "API call: VDI.add_to_sm_config sr=%s vdi=%s key=%s value=%s" sr vdi key value;
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.add_to_sm_config ctx dbg metadata vdi key value
 
 	let remove_from_sm_config ctx ~dbg ~sr ~vdi ~key =
-	  failwith "Unimplemented"
+	  info "API call: VDI.remove_from_sm_config sr=%s vdi=%s key=%s" sr vdi key;
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.remove_from_sm_config ctx dbg metadata vdi key 
 
 	let compose ctx ~dbg ~sr ~vdi1 ~vdi2 = 
 	  failwith "Unimplemented"
@@ -407,10 +411,14 @@ module VDI = struct
 	  failwith "Unimplemented"
 
 	let set_persistent ctx ~dbg ~sr ~vdi ~persistent =
-	  failwith "Unimplemented"
+	  info "API call: VDI.set_persistent sr=%s vdi=%s persistent=%b" sr vdi persistent;
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.set_persistent ctx dbg metadata vdi persistent
 
 	let stat ctx ~dbg ~sr ~vdi =
-	  failwith "Unimplemented"
+	  info "API call: VDI.stat";
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.stat ctx dbg metadata vdi
 
 	let update ctx gp sr vdi =
 		info "API call: VDI.update";
@@ -419,18 +427,12 @@ module VDI = struct
 
 
 
-	let introduce ctx gp sr uuid sm_config location =
-		info "API call: VDI.introduce sr=%s uuid=%s location=%s sm_config=[%s]" sr uuid location (String.concat "; " (List.map (fun (a,b) -> Printf.sprintf "'%s','%s'" a b) sm_config));
-		let metadata = Attachments.gmm sr in
-		VhdMaster.VDI.introduce ctx metadata gp uuid sm_config location
-
 	let destroy ctx ~dbg ~sr ~vdi =
 		info "API call: VDI.delete sr=%s vdi=%s" sr vdi;
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.delete ctx metadata vdi
 
 	let snapshot ctx ~dbg ~sr ~vdi_info =
-	  let vdi = vdi_info.vdi in
 	  info "API call: VDI.snapshot sr=%s vdi=%s" sr vdi_info.vdi ;
 	  let metadata = Attachments.gmm sr in
 	  VhdMaster.VDI.snapshot ctx metadata vdi_info

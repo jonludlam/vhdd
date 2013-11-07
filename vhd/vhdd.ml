@@ -25,19 +25,17 @@ let xmlrpc_handler req fd () =
 	let body = read_body req fd in
 	debug "Request: %s" body;
 
-	let xml = Xml.parse_string body in
+	let rpc = Xmlrpc.call_of_string body in
 
-	(* Extract some info from the XML before we pass it to process *)
-	let call,args = XMLRPC.From.methodCall xml in
 	let context = Context.({
 		c_driver=path; 
-		c_api_call=call; 
+		c_api_call=rpc.Rpc.name; 
 		c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); 
 		c_other_info=[]; }) in
-	Tracelog.append context (Tracelog.SmapiCall {Tracelog.path=path; body=(Xml.to_string xml); call=call}) None;
+	Tracelog.append context (Tracelog.SmapiCall {Tracelog.path=path; body=body; call=rpc.Rpc.name}) None;
 	Debug.associate_thread_with_task context.Context.c_task_id;
-(*	let result = P.process context xml in*)
-	let str = (*Xml.to_string result *) "moo" in
+	let result = S.process context rpc in
+	let str = Xmlrpc.string_of_response result in
 	Tracelog.append context (Tracelog.SmapiResult {Tracelog.result=str;}) None;
 	Tracelog.dump "/tmp/tracelog";
 	debug "Response: %s" str;
@@ -109,6 +107,14 @@ let server_init () =
 
 	let driver_names = Drivers.get_all_driver_names () in
 	List.iter register driver_names;
+
+	let queue_name = "org.xen.xcp.storage.local" in
+
+
+	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
+	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="local"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
+
+	ignore(Thread.create (fun () -> Xcp_service.serve_forever service) ());
 
 	Global.ready := true;
 
@@ -274,17 +280,9 @@ let _ =
 	Lvm.Lvmdebug.debug_hook := Some MLVMDebug.debug;
 
 
-	let queue_name = "org.xen.xcp.storage.local" in
-
 	Vhdrpc.local_rpc := Int_server.local_rpc;
 
-	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
-	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="local"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
-	Xcp_service.serve_forever service
-
-
-
-(*	if not !Global.nodaemon then (Unixext.daemonize ());
+	if not !Global.nodaemon then (Unixext.daemonize ());
 
 	Unixext.pidfile_write !Global.pidfile;
 
@@ -292,4 +290,4 @@ let _ =
 
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
-	watchdog server_init*)
+	watchdog server_init

@@ -47,11 +47,26 @@ and activation_ty =
 	| ActiveRW of string
 	| ActiveRWRaw of string list
 
+and smapiv2_info_ty = {
+	content_id : Storage_interface.content_id;
+	name_label : string;
+	name_description : string;
+	ty : string;
+	metadata_of_pool : string;
+	is_a_snapshot : bool;
+	snapshot_time : string;
+	snapshot_of : Storage_interface.vdi;
+	read_only : bool;
+	persistent : bool;
+	sm_config : (string * string) list;
+}
+
 and leaf_info = {
 	current_operations : MLock.state; 
 	attachment : attachment_ty option;
 	active_on : activation_ty option;
 	reservation_override : Vhdutil.reservation_mode option;
+	smapiv2_info : smapiv2_info_ty;
 	leaf : pointer;
 }
 

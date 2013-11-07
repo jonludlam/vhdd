@@ -74,6 +74,7 @@ module VDI = struct
 	let thin_provision_request_more_space context metadata host ids_and_physsizes =
 		failwith "Not implemented"
 
+		  
 	let create context metadata vdi_info =
 	  let virtual_size = vdi_info.virtual_size in
 	  let sm_config = vdi_info.sm_config in
@@ -136,7 +137,21 @@ module VDI = struct
 			end
 		in
 
-		Id_map.add_to_id_map context metadata id ptr None;
+		let smapiv2_info = {
+		  content_id="";
+		  name_label=vdi_info.name_label;
+		  name_description=vdi_info.name_description;
+		  ty=vdi_info.ty;
+		  metadata_of_pool=vdi_info.metadata_of_pool;
+		  is_a_snapshot=false;
+		  snapshot_time="";
+		  snapshot_of="";
+		  read_only=false;
+		  persistent=true;
+		  sm_config=vdi_info.sm_config;
+		} in
+
+		Id_map.add_to_id_map context metadata id ptr None smapiv2_info;
 
 		{vdi_info with vdi=id;
 		  is_a_snapshot=false;
@@ -152,20 +167,59 @@ module VDI = struct
 		(* Update the virtual_size, physical_utilisation, read_only flag and sm_config map *)
 		
 		()
-						
-					
+		  
+	let stat ctx dbg metadata vdi =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  let leaf_infos = Locking.get_all_leaf_infos ctx metadata in
+	  let leaf_info = try List.assoc id leaf_infos with _ -> failwith "Unknown VDI" in
+	  let container = Locking.with_container_read_lock ctx metadata (fun () -> metadata.m_data.m_vhd_container) in
+	  let phys_size,virt_size = match leaf_info.leaf with
+	    | PVhd vhduid ->
+	      let vhd = Vhd_records.get_vhd ctx metadata.m_data.m_vhds vhduid in
+	      let phys_size = fst (Lvmabs.size ctx container vhd.location) in
+	      phys_size, vhd.size.Vhdutil.virtual_size
+	    | PRaw location_info ->
+	      let phys_size = fst (Lvmabs.size ctx container location_info) in
+	      phys_size, phys_size
+	  in
+	  { vdi=id;
+	    content_id       = leaf_info.smapiv2_info.content_id;
+	    name_label       = leaf_info.smapiv2_info.name_label;
+	    name_description = leaf_info.smapiv2_info.name_description;
+	    ty               = leaf_info.smapiv2_info.ty;
+	    metadata_of_pool = leaf_info.smapiv2_info.metadata_of_pool;
+	    is_a_snapshot    = leaf_info.smapiv2_info.is_a_snapshot;
+	    snapshot_time    = leaf_info.smapiv2_info.snapshot_time;
+	    snapshot_of      = leaf_info.smapiv2_info.snapshot_of;
+	    read_only        = leaf_info.smapiv2_info.read_only;
+	    virtual_size     = virt_size;
+	    physical_utilisation = phys_size;
+	    persistent       = true;
+	    sm_config        = leaf_info.smapiv2_info.sm_config; }
+	    
 
-	let introduce context metadata device_config uuid sm_config id =
-		let leaf_info=Master_helpers.safe_get_leaf_info context metadata id in
-		let ptr = leaf_info.leaf in
-		match ptr with
-			| PVhd vhduid ->
-				let vhd = Vhd_records.get_vhd context metadata.m_data.m_vhds vhduid in
-				let xapi_size = Vhdutil.get_phys_size vhd.size in
+	let set_persistent ctx dbg metadata vdi persistent =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    {smapiv2_info with persistent=persistent})
 
-				id
-			| PRaw x ->
-				failwith "Not implemented"
+	let add_to_sm_config ctx dbg metadata vdi key value =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    { smapiv2_info with
+	      sm_config = (key,value)::(List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config) }
+	  )
+
+	let remove_from_sm_config ctx dbg metadata vdi key =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    { smapiv2_info with
+	      sm_config = List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config }
+	  )
 
 	let delete context metadata vdi =
 		let id = vdi in
@@ -210,27 +264,12 @@ module VDI = struct
 		check_all_hosts_present context metadata;
 		debug "OK";
 
-		let result = Clone.clone context metadata id new_reservation_override in
+		let result = Clone.clone context metadata vdi new_reservation_override in
 		result
 
-	let clone context metadata vdi = 
-	  let new_id = clone_inner None context metadata vdi in
-	  {vdi with 
-	    vdi=new_id;
-	    is_a_snapshot=false;
-	    snapshot_time="";
-	    snapshot_of="";
-	    physical_utilisation=0L }
+	let clone context metadata vdi = clone_inner None context metadata vdi 
 
-	let snapshot context metadata vdi = 
-	  let new_id = clone_inner (Some Vhdutil.Attach) context metadata vdi in
-	  {vdi with
-	    vdi=new_id;
-	    is_a_snapshot=true;
-	    snapshot_time="now";
-	    snapshot_of=vdi.vdi;
-	    physical_utilisation=0L}
-
+	let snapshot context metadata vdi = clone_inner (Some Vhdutil.Attach) context metadata vdi
 
 	let resize context metadata vdi newsize =
 		let id = vdi in
@@ -617,7 +656,6 @@ end
 	let scan context driver sr =
 		fix_ctx context None;
 		let metadata = Attachments.gmm sr in
-		let device_config = Attachments.((get_sr_info sr).device_config) in
 		if not metadata.m_data.m_rolling_upgrade then begin
 			Coalesce.with_coalesce_lock context metadata (fun () -> 
 				let contents = classify_sr_contents context metadata in
@@ -655,7 +693,7 @@ end
 	let update context driver sr = 
 		fix_ctx context None;
 		let metadata = Attachments.gmm sr in
-		()
+		ignore metadata
 
 	let slave_attach context metadata tok host ids =
 		fix_ctx context None;

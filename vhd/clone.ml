@@ -13,7 +13,7 @@ let syslog s =
 
 
 let clone context metadata vdi new_reservation_override =
-	let id = vdi in
+	let id = vdi.Storage_interface.vdi in
 	Locking.with_clone_lock context metadata id
 		(fun leaf_info ->
 			(* Note - we disallow attach/detach/activate/deactivate while an operation is
@@ -67,8 +67,8 @@ let clone context metadata vdi new_reservation_override =
 						if need_reattach then reattach context metadata id;
 
 						(* At this point, we hand over responsibility for the parent to coalesce *)
-						Vhd_records.update_vhd_size context metadata.m_data.m_vhds parent_vhd_uid new_size;
-						Vhd_records.update_hidden context metadata.m_data.m_vhds (PVhd parent_vhd_uid) hidden;
+						ignore(Vhd_records.update_vhd_size context metadata.m_data.m_vhds parent_vhd_uid new_size);
+						ignore(Vhd_records.update_hidden context metadata.m_data.m_vhds (PVhd parent_vhd_uid) hidden);
 
 						debug "Marked vhd: %s as hidden=%d" parent_vhd_uid hidden;
 						if hidden=2 then Coalesce.relink_children context metadata parent_vhd_uid;
@@ -83,6 +83,35 @@ let clone context metadata vdi new_reservation_override =
 
 			(* Note at this point, the original vhd has disappeared *)
 
-			Id_map.add_to_id_map context metadata new_id2 (PVhd vhd2.vhduid) new_reservation_override;
+			let smapiv2_info = {
+			  content_id="";
+			  name_label=vdi.Storage_interface.name_label;
+			  name_description=vdi.Storage_interface.name_description;
+			  ty=vdi.Storage_interface.ty;
+			  metadata_of_pool=vdi.Storage_interface.metadata_of_pool;
+			  is_a_snapshot=true;
+			  snapshot_time="now";
+			  snapshot_of=vdi.Storage_interface.vdi;
+			  read_only=false;
+			  persistent=true;
+			  sm_config=vdi.Storage_interface.sm_config;
+			} in
+			
+			Id_map.add_to_id_map context metadata new_id2 (PVhd vhd2.vhduid) new_reservation_override smapiv2_info;
 
-			new_id2)
+			Storage_interface.({
+			  vdi=new_id2;
+			  content_id = smapiv2_info.content_id;
+			  name_label       = smapiv2_info.name_label;
+			  name_description = smapiv2_info.name_description;
+			  ty               = smapiv2_info.ty;
+			  metadata_of_pool = smapiv2_info.metadata_of_pool;
+			  is_a_snapshot    = smapiv2_info.is_a_snapshot;
+			  snapshot_time    = smapiv2_info.snapshot_time;
+			  snapshot_of      = smapiv2_info.snapshot_of;
+			  read_only        = smapiv2_info.read_only;
+			  virtual_size     = new_vsize;
+			  physical_utilisation = lvsize2;
+			  persistent       = true;
+			  sm_config        = leaf_info.smapiv2_info.sm_config;
+			}))
