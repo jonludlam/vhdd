@@ -28,7 +28,7 @@ and slave_attach_info = {
 
 type host = {
 	h_uuid : string;
-	h_ip : string;
+	h_ip : string option;
 	h_port : int;
 } with rpc
 

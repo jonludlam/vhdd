@@ -49,7 +49,7 @@ let localhost = ref None
 let get_localhost () =
 	match !localhost with
 		| None ->
-			let me = {Int_types.h_uuid=get_host_uuid (); h_ip=(Unix.string_of_inet_addr (get_mgt_ip ())); h_port= !port} in
+			let me = {Int_types.h_uuid=get_host_uuid (); h_ip=Some (Unix.string_of_inet_addr (get_mgt_ip ())); h_port= !port} in
 			localhost := Some me;
 			me
 		| Some me -> me

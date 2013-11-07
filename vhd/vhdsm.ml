@@ -127,7 +127,7 @@ module SR = struct
 
 				| Slave (Some host) ->
 
-					slave_conf.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task host.h_ip host.h_port);
+					slave_conf.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task (match host.h_ip with Some x -> x | None -> "Unknown")  host.h_port);
 
 					let reg () =
 						VhdSlave.SR.register_with_master ctx slave_conf host;
@@ -232,7 +232,7 @@ module SR = struct
 		debug "mode=%s"
 			(match mode with
 				| Master -> "Master"
-				| Slave (Some host) -> Printf.sprintf "Slave (%s,%s,%d)" host.h_uuid host.h_ip host.h_port
+				| Slave (Some host) -> Printf.sprintf "Slave (%s,%s,%d)" host.h_uuid (match host.h_ip with Some x -> x | None -> "Unknown") host.h_port
 				| Slave None -> Printf.sprintf "Slave nomaster");
 		mode
 
@@ -341,7 +341,11 @@ module SR = struct
 	   reattaching its SRs. *)
 	let slave_recover ctx tok sr master =
 		let metadata = Attachments.gsm sr in
-		metadata.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task master.h_ip 4094);
+		if master.h_uuid = Global.get_host_uuid () then begin
+		  metadata.Vhd_types.s_rpc <- (!Vhdrpc.local_rpc)
+		end else begin 
+		  metadata.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task (match master.h_ip with Some x -> x | None -> "unknown") master.h_port)
+		end;
 		VhdSlave.SR.slave_recover ctx metadata tok master
 
 	(* Part of the infrastructure to support thin provisioning *)

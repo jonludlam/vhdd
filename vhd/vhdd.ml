@@ -276,13 +276,15 @@ let _ =
 
 	let queue_name = "org.xen.xcp.storage.local" in
 
+	Vhdrpc.local_rpc := Int_server.local_rpc;
+
 	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
 	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="local"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
 	Xcp_service.serve_forever service
 
-(*	Vhdrpc.local_rpc := Int_server.local_rpc;
 
-	if not !Global.nodaemon then (Unixext.daemonize ());
+
+(*	if not !Global.nodaemon then (Unixext.daemonize ());
 
 	Unixext.pidfile_write !Global.pidfile;
 

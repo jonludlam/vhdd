@@ -44,7 +44,7 @@ type context = {
   mutable c_other_info : (string * string) list
 } with rpc
 
-module D = Debug.Debugger(struct let name="smapi_types" end)
+module D = Debug.Make(struct let name="smapi_types" end)
 open D
 
 exception Unmarshalling_error of string

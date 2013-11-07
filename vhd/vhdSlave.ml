@@ -690,8 +690,8 @@ module SR = struct
 		()
 
 	let slave_recover context metadata tok master =
-		debug "Recover called";
-		metadata.s_rpc <- (fun task xml -> Vhdrpc.remote_rpc task master.h_ip master.h_port xml);
+	  debug "Recover called";
+            
 		let currently_attached =
 			Nmutex.execute context metadata.s_mutex "Finding all currently attached VDIs" (fun () ->
 				Hashtbl.fold (fun k v acc -> (k,v)::acc) metadata.s_data.s_attached_vdis [])

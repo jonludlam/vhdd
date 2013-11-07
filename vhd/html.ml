@@ -115,7 +115,7 @@ let vhd_to_tr k vhd =
 
 let ssa_to_tr ssa =
 	tr [td [text ssa.ssa_host.h_uuid];
-	td [text ssa.ssa_host.h_ip];
+	td [text (match ssa.ssa_host.h_ip with Some x -> x | None -> "Unknown")];
 	td [text (string_of_bool ssa.ssa_resync_required)]
 	]
 
@@ -175,7 +175,7 @@ let slave_to_html k metadata =
 		(match metadata.s_data.s_master with
 			| Some m -> [h 2 [text "Current master"];
 			  table ((thead [tr [th [text "uuid"]; th [text "ip"]; th [text "port"]]])::
-				  [tr [td [text m.h_uuid]; td [text m.h_ip]; td [text (string_of_int m.h_port)]]])]
+				  [tr [td [text m.h_uuid]; td [text (match m.h_ip with Some x -> x | None -> "Unknown")]; td [text (string_of_int m.h_port)]]])]
 			| None -> [h 2 [text "No current master"]]) @ [			  
 			h 2 [text "Current attached VDIs"];
 			table ((thead [tr [th [text "Location"]; th [text "tapdev"]; th [text "leaf"]; th [text "LVs"]; th [text "Phys size"]; th [text "Max size"]; th [text "Activated"]]])::

@@ -375,7 +375,7 @@ end
 						(* If we're forcibly taking over mastership from someone else, we need to make
 						   sure it's not still the master *)
 						debug "Found that the SR believes another host is the master. Attempting to query";
-						let rpc = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc context.Context.c_task_id h.h_ip h.h_port) in
+						let rpc = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc context.Context.c_task_id (match h.h_ip with Some x -> x | None -> "unknown")  h.h_port) in
 						let ok =
 							try
 								let old_master_mode = Int_client.SR.mode rpc sr in
@@ -659,12 +659,12 @@ end
 
 	let slave_attach context metadata tok host ids =
 		fix_ctx context None;
-		debug "Attach from host: %s, ip: %s" (host.h_uuid) (host.h_ip);
+		debug "Attach from host: %s, ip: %s" (host.h_uuid) (match host.h_ip with Some x -> x | None -> "unknown");
 		Slave_sr_attachments.slave_sr_attach context metadata host ids
 
 	let slave_detach context metadata tok host =
 		fix_ctx context None;
-		debug "Detach from host: %s, ip: %s" (host.h_uuid) (host.h_ip);
+		debug "Detach from host: %s, ip: %s" (host.h_uuid) (match host.h_ip with Some x -> x | None -> "unknown");
 		Slave_sr_attachments.slave_sr_detach context metadata host
 
 	let set_host_dead context metadata host_uuid =

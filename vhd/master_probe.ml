@@ -14,7 +14,7 @@ exception NoMaster
 
 let test_master ctx m sr =
 	try
-		let remote_attach_mode = Int_client.SR.mode (Int_rpc.wrap_rpc (Vhdrpc.remote_rpc ctx.c_task_id m.h_ip m.h_port)) sr in
+		let remote_attach_mode = Int_client.SR.mode (Int_rpc.wrap_rpc (Vhdrpc.remote_rpc ctx.c_task_id (match m.h_ip with Some x -> x | None -> failwith "No IP") m.h_port)) sr in
 		begin
 			match remote_attach_mode with
 				| Master -> true
@@ -51,7 +51,7 @@ let master_probe ctx driver path sr =
 							| Some m -> m
 							| None -> raise NoMaster
 					in
-					debug "host_attachments read: Master is apparently at uuid=%s ip=%s port=%d" m.h_uuid m.h_ip m.h_port;
+					debug "host_attachments read: Master is apparently at uuid=%s ip=%s port=%d" m.h_uuid (match m.h_ip with Some x -> x | None -> "Unknown") m.h_port;
 					if test_master ctx m sr then
 						m
 					else
