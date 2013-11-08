@@ -86,8 +86,8 @@ let server_init () =
 	Http_svr.Server.add_handler server Http.Post "/internal" (Http_svr.FdIO internal_handler);
 	Http_svr.Server.add_handler server Http.Post "/global" (Http_svr.FdIO internal_handler);
 
-(*	if !Global.enable_fileserver then
-		Http_svr.Server.add_handler server Http.Get "/" (Http_svr.BufIO (Fileserver.send_file "/" !Global.fileserver_base));*)
+	if !Global.enable_fileserver then
+	  Http_svr.Server.add_handler server Http.Get "/" (Http_svr.BufIO (Fileserver.send_file "/" !Global.fileserver_base));
 
 	ignore(Thread.create (fun () -> Fd_pass_receiver.start "/debug" xmlrpc_handler) ());
 	ignore(Thread.create (fun () -> Fd_pass_receiver.start "/internal" internal_handler) ());
@@ -108,12 +108,23 @@ let server_init () =
 	let driver_names = Drivers.get_all_driver_names () in
 	List.iter register driver_names;
 
-	let queue_name = "org.xen.xcp.storage.local" in
-
+	let queue_name = match !Global.host_uuid, !Global.dummy with
+	  | Some h, true -> Printf.sprintf "org.xen.xcp.storage.local_%s" h
+	  | None, _ -> "org.xen.xcp.storage.local"
+	in
 
 	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
 	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="local"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
+	ignore(Thread.create (fun () -> Xcp_service.serve_forever service) ());
 
+
+	let queue_name = match !Global.host_uuid, !Global.dummy with
+	  | Some h, true -> Printf.sprintf "org.xen.xcp.storage.lvmnew_%s" h
+	  | None, _ -> "org.xen.xcp.storage.lvmnew"
+	in
+
+	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
+	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="lvmnew"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
 	ignore(Thread.create (fun () -> Xcp_service.serve_forever service) ());
 
 	Global.ready := true;
@@ -271,6 +282,7 @@ let _ =
 		Global.mgt_iface := Some "lo";
 		Global.pool_secret := Some "dummy";
 		Global.unsafe_mode := true;
+		Global.nowatchdog := true;
 (*		Logs.reset_all [ Printf.sprintf "file:%s/var/log/vhdd.log" (Global.get_host_local_dummydir ()) ];*)
 		Lvm.Vg.set_dummy_mode (Printf.sprintf "%s" !Global.dummydir) (Printf.sprintf "%s/dev/mapper" (Global.get_host_uuid ())) false;
 		Tapdisk.my_context := (Tapctl.create_dummy (Global.get_host_local_dummydir ()));
@@ -284,7 +296,7 @@ let _ =
 
 	if not !Global.nodaemon then (Unixext.daemonize ());
 
-	Unixext.pidfile_write !Global.pidfile;
+	if not !Global.dummy then Unixext.pidfile_write !Global.pidfile;
 
         Unixext.mkdir_rec "/var/run/sr-mount" 0o755;
 

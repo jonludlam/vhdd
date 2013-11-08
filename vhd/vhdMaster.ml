@@ -167,18 +167,14 @@ module VDI = struct
 		(* Update the virtual_size, physical_utilisation, read_only flag and sm_config map *)
 		
 		()
-		  
-	let stat ctx dbg metadata vdi =
-	  let id = vdi in
-	  fix_ctx ctx (Some id);
-	  let leaf_infos = Locking.get_all_leaf_infos ctx metadata in
-	  let leaf_info = try List.assoc id leaf_infos with _ -> failwith "Unknown VDI" in
-	  let container = Locking.with_container_read_lock ctx metadata (fun () -> metadata.m_data.m_vhd_container) in
+
+	let vhd_info_of_leaf ctx dbg metadata container (id,leaf_info) =
 	  let phys_size,virt_size = match leaf_info.leaf with
 	    | PVhd vhduid ->
 	      let vhd = Vhd_records.get_vhd ctx metadata.m_data.m_vhds vhduid in
+	      let virtual_size = Vhdutil.get_virtual_size vhd.size in
 	      let phys_size = fst (Lvmabs.size ctx container vhd.location) in
-	      phys_size, vhd.size.Vhdutil.virtual_size
+	      phys_size, virtual_size
 	    | PRaw location_info ->
 	      let phys_size = fst (Lvmabs.size ctx container location_info) in
 	      phys_size, phys_size
@@ -195,9 +191,17 @@ module VDI = struct
 	    read_only        = leaf_info.smapiv2_info.read_only;
 	    virtual_size     = virt_size;
 	    physical_utilisation = phys_size;
-	    persistent       = true;
+	    persistent       = leaf_info.smapiv2_info.persistent;
 	    sm_config        = leaf_info.smapiv2_info.sm_config; }
 	    
+
+		  
+	let stat ctx dbg metadata vdi =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  let leaf_info = Locking.locked_get_leaf_info ctx metadata id in
+	  let container = Locking.with_container_read_lock ctx metadata (fun () -> metadata.m_data.m_vhd_container) in
+	  vhd_info_of_leaf ctx dbg metadata container (id,leaf_info)
 
 	let set_persistent ctx dbg metadata vdi persistent =
 	  let id = vdi in
@@ -660,7 +664,7 @@ end
 				List.map (fun f -> Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData f])])) srs)
 
 	(* TODO: Fix up xapi's database. This currently only kicks off the coalesce process *)
-	let scan context driver sr =
+	let scan context dbg sr =
 		fix_ctx context None;
 		let metadata = Attachments.gmm sr in
 		if not metadata.m_data.m_rolling_upgrade then begin
@@ -682,20 +686,10 @@ end
 					ignore(Locking.with_container_write_lock context metadata (fun container -> (Lvmabs.remove context container vhd.location, ())))) contents.unreachable_vhds;
 				List.iter (fun vdi -> try ignore(VDI.do_leaf_coalesce context metadata vdi) with Leaf_coalesce.Cant_leaf_coalesce _ -> ()) contents.leaf_coalescable_ids)
 		end;
-		[]
 
-	(*    let sr = match metadata.m_sr.sr_ref with Some r -> r | None -> failwith "Need SR ref!" in
-		  let session = device_config.session_ref in
-		  let vdis = Client.VDI.get_all_records ~rpc:xapirpc ~session_id:session in
-		  let sr_vdis = List.filter (fun (vdi,vdir) -> vdir.API.vDI_SR=sr) vdis in
-		  Hashtbl.iter (fun vhduid vhdr ->
-		  if vhdr.is_leaf then begin
-		  if List.exists (fun (vdi,vdir) -> vdir.API.vDI_location = vhdr.vhduid) sr_vdis then () else
-		  let uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
-		  ignore(Client.VDI.db_introduce
-		  ~rpc:xapirpc ~session_id:session ~uuid:uuid ~name_label:uuid ~name_description:"Found by scan"
-		  ~sR:sr ~_type:`user ~sharable:false ~read_only:(not vhdr.is_leaf) ~other_config:[] ~location:vhdr.vhduid
-		  ~xenstore_data:[] ~sm_config:[]) end) metadata.vhds*)
+		let leaf_infos = Locking.get_all_leaf_infos context metadata in
+		let container = Locking.with_container_read_lock context metadata (fun () -> metadata.m_data.m_vhd_container) in
+		List.map (VDI.vhd_info_of_leaf context dbg metadata container) leaf_infos
 
 	let update context driver sr = 
 		fix_ctx context None;

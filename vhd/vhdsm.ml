@@ -71,7 +71,7 @@ module SR = struct
 		with Transport.MissingParam name ->
 		        raise (Missing_configuration_parameter name)
 
-	let scan ctx ~dbg ~sr = VhdMaster.SR.scan ctx (Drivers.of_ctx ctx) sr
+	let scan ctx ~dbg ~sr = VhdMaster.SR.scan ctx dbg sr
 
 	let update ctx sr = VhdMaster.SR.update ctx (Drivers.of_ctx ctx) sr
 
@@ -390,7 +390,9 @@ module VDI = struct
 	  VhdMaster.VDI.remove_from_sm_config ctx dbg metadata vdi key 
 
 	let compose ctx ~dbg ~sr ~vdi1 ~vdi2 = 
-	  failwith "Unimplemented"
+	  info "API call: VDI.compose sr=%s vdi1=%s vdi2=%s" sr vdi1 vdi2;
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.compose ctx dbg metadata vdi1 vdi2
 
 	let set_content_id ctx ~dbg ~sr ~vdi ~content_id = 
 	  info "API call: VDI.set_content_id sr=%s vdi=%s content_id=%s" sr vdi content_id;
