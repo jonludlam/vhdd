@@ -221,6 +221,13 @@ module VDI = struct
 	      sm_config = List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config }
 	  )
 
+	let set_content_id ctx dbg metadata vdi content_id =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    { smapiv2_info with
+	      content_id = content_id })
+
 	let delete context metadata vdi =
 		let id = vdi in
 		fix_ctx context (Some id);

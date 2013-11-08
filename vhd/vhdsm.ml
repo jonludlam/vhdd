@@ -393,7 +393,9 @@ module VDI = struct
 	  failwith "Unimplemented"
 
 	let set_content_id ctx ~dbg ~sr ~vdi ~content_id = 
-	  failwith "Unimplemented"
+	  info "API call: VDI.set_content_id sr=%s vdi=%s content_id=%s" sr vdi content_id;
+	  let metadata = Attachments.gmm sr in
+	  VhdMaster.VDI.set_content_id ctx dbg metadata vdi content_id
 
 	let get_by_name ctx ~dbg ~sr ~name =
 	  failwith "Unimplemented"
@@ -424,8 +426,6 @@ module VDI = struct
 		info "API call: VDI.update";
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.update ctx metadata gp vdi
-
-
 
 	let destroy ctx ~dbg ~sr ~vdi =
 		info "API call: VDI.delete sr=%s vdi=%s" sr vdi;
