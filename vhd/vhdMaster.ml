@@ -193,8 +193,6 @@ module VDI = struct
 	    physical_utilisation = phys_size;
 	    persistent       = leaf_info.smapiv2_info.persistent;
 	    sm_config        = leaf_info.smapiv2_info.sm_config; }
-	    
-
 		  
 	let stat ctx dbg metadata vdi =
 	  let id = vdi in
@@ -208,6 +206,39 @@ module VDI = struct
 	  fix_ctx ctx (Some id);
 	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
 	    {smapiv2_info with persistent=persistent})
+
+	let compose ctx dbg metadata vdi1 vdi2 =
+	  (* VDI1 contains some diffs, and VDI2 contains the base copy. This sets
+	     VDI1's parent to be VDI2 and deletes VDI2 *)
+	  let id = vdi in
+	  fix_ctx context (Some id);
+	  check_all_hosts_present context metadata;
+
+	  Locking.with_delete_lock context metadata vdi2 (fun leaf_info ->
+	    if leaf_info.attachment <> None then failwith "Can't compose onto an attached VDI";
+	    let ptr = leaf_info.leaf in
+	    match ptr with
+	    | PVhd vhduid ->
+	      Id_map.remove_id_from_map context metadata id;
+
+	      let vhd = Vhd_records.get_vhd context metadata.m_data.m_vhds vhduid in
+	      let (hidden,size) = Master_utils.set_hidden context metadata vhd in
+	      Vhd_records.update_hidden context metadata.m_data.m_vhds (PVhd vhduid) hidden;
+	      let vhdrec = Vhd_records.remove_vhd context metadata.m_data.m_vhds vhduid in
+
+	      Html.signal_master_metadata_change metadata ();
+
+	      ignore(Locking.with_container_write_lock context metadata (fun container ->
+		let container = Lvmabs.remove context container vhdrec.location in
+		(Lvmabs.commit context container,())));
+
+	      Html.signal_master_metadata_change metadata ()
+
+
+	    | PRaw x ->
+	      failwith "Not implemented"
+	  )
+
 
 	let add_to_sm_config ctx dbg metadata vdi key value =
 	  let id = vdi in
