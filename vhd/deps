@@ -49,17 +49,17 @@ int_client.cmo : vhd_types.cmo vhd_records.cmi lvmabs_types.cmi \
 int_client.cmx : vhd_types.cmx vhd_records.cmx lvmabs_types.cmx \
     int_types.cmx int_rpc.cmx global.cmx
 int_client_utils.cmo : vhdrpc.cmo vhd_types.cmo tracelog.cmo \
-    slave_sr_attachments.cmo int_types.cmo int_rpc.cmo
+    slave_sr_attachments.cmo int_types.cmo int_rpc.cmo global.cmo
 int_client_utils.cmx : vhdrpc.cmx vhd_types.cmx tracelog.cmx \
-    slave_sr_attachments.cmx int_types.cmx int_rpc.cmx
+    slave_sr_attachments.cmx int_types.cmx int_rpc.cmx global.cmx
 int_rpc.cmo : int_types.cmo extentlist.cmo
 int_rpc.cmx : int_types.cmx extentlist.cmx
-int_server.cmo : vhdutil.cmo vhdsm.cmi vhd_types.cmo vhd_records.cmi \
+int_server.cmo : vhdutil.cmo vhdsm.cmo vhd_types.cmo vhd_records.cmi \
     nmutex.cmo lvmabs_types.cmi int_types.cmo int_rpc.cmo global.cmo \
-    debug_utils.cmo attachments.cmi
+    debug_utils.cmo context.cmo attachments.cmi
 int_server.cmx : vhdutil.cmx vhdsm.cmx vhd_types.cmx vhd_records.cmx \
     nmutex.cmx lvmabs_types.cmx int_types.cmx int_rpc.cmx global.cmx \
-    debug_utils.cmx attachments.cmx
+    debug_utils.cmx context.cmx attachments.cmx
 int_types.cmo : context.cmo
 int_types.cmx : context.cmx
 iscsilib.cmo :
@@ -114,10 +114,10 @@ slave_sr_attachments.cmo : vhd_types.cmo tracelog.cmo nmutex.cmo lvmabs.cmi \
     int_types.cmo html.cmo global.cmo circ.cmi
 slave_sr_attachments.cmx : vhd_types.cmx tracelog.cmx nmutex.cmx lvmabs.cmx \
     int_types.cmx html.cmx global.cmx circ.cmx
-tapdisk.cmo : global.cmo
-tapdisk.cmx : global.cmx
-tapdisk_listen.cmo : vhdrpc.cmo int_rpc.cmo int_client.cmo global.cmo
-tapdisk_listen.cmx : vhdrpc.cmx int_rpc.cmx int_client.cmx global.cmx
+tapdisk.cmo : tapdisk_listen.cmo global.cmo
+tapdisk.cmx : tapdisk_listen.cmx global.cmx
+tapdisk_listen.cmo : vhdrpc.cmo int_rpc.cmo int_client.cmo
+tapdisk_listen.cmx : vhdrpc.cmx int_rpc.cmx int_client.cmx
 tracelog.cmo : vhd_types.cmo vhd_records.cmi nmutex.cmo lvmabs_types.cmi \
     int_types.cmo context.cmo
 tracelog.cmx : vhd_types.cmx vhd_records.cmx nmutex.cmx lvmabs_types.cmx \
@@ -130,20 +130,20 @@ vhdMaster.cmo : vhdutil.cmo vhdrpc.cmo vhd_types.cmo vhd_records.cmi \
     tracelog.cmo slave_sr_attachments.cmo scan.cmo rwlock.cmo olvm.cmi \
     nmutex.cmo master_utils.cmo lvmabs_types.cmi lvmabs.cmi locking.cmo \
     leaf_coalesce.cmo int_types.cmo int_rpc.cmo int_client_utils.cmo \
-    int_client.cmo id_map.cmo html.cmo global.cmo drivers.cmo coalesce.cmi \
-    clone.cmo attachments.cmi
+    int_client.cmo id_map.cmo html.cmo global.cmo drivers.cmo context.cmo \
+    coalesce.cmi clone.cmo attachments.cmi
 vhdMaster.cmx : vhdutil.cmx vhdrpc.cmx vhd_types.cmx vhd_records.cmx \
     tracelog.cmx slave_sr_attachments.cmx scan.cmx rwlock.cmx olvm.cmx \
     nmutex.cmx master_utils.cmx lvmabs_types.cmx lvmabs.cmx locking.cmx \
     leaf_coalesce.cmx int_types.cmx int_rpc.cmx int_client_utils.cmx \
-    int_client.cmx id_map.cmx html.cmx global.cmx drivers.cmx coalesce.cmx \
-    clone.cmx attachments.cmx
-vhdSlave.cmo : vhdutil.cmo vhdrpc.cmo vhd_types.cmo tracelog.cmo tapdisk.cmo \
-    nmutex.cmo leaf_coalesce.cmo int_types.cmo int_client_utils.cmo \
-    int_client.cmo html.cmo host.cmi global.cmo drivers.cmo attachments.cmi
-vhdSlave.cmx : vhdutil.cmx vhdrpc.cmx vhd_types.cmx tracelog.cmx tapdisk.cmx \
-    nmutex.cmx leaf_coalesce.cmx int_types.cmx int_client_utils.cmx \
-    int_client.cmx html.cmx host.cmx global.cmx drivers.cmx attachments.cmx
+    int_client.cmx id_map.cmx html.cmx global.cmx drivers.cmx context.cmx \
+    coalesce.cmx clone.cmx attachments.cmx
+vhdSlave.cmo : vhdutil.cmo vhd_types.cmo tracelog.cmo tapdisk.cmo nmutex.cmo \
+    leaf_coalesce.cmo int_types.cmo int_client_utils.cmo int_client.cmo \
+    html.cmo host.cmi global.cmo drivers.cmo attachments.cmi
+vhdSlave.cmx : vhdutil.cmx vhd_types.cmx tracelog.cmx tapdisk.cmx nmutex.cmx \
+    leaf_coalesce.cmx int_types.cmx int_client_utils.cmx int_client.cmx \
+    html.cmx host.cmx global.cmx drivers.cmx attachments.cmx
 vhd_records.cmo : vhdutil.cmo ocamltest.cmi nmutex.cmo lvmabs_types.cmi \
     context.cmo vhd_records.cmi
 vhd_records.cmx : vhdutil.cmx ocamltest.cmx nmutex.cmx lvmabs_types.cmx \
@@ -152,22 +152,22 @@ vhd_types.cmo : vhdutil.cmo vhd_records.cmi rwlock.cmo nmutex.cmo \
     lvmabs_types.cmi lockgen.cmi int_types.cmo
 vhd_types.cmx : vhdutil.cmx vhd_records.cmx rwlock.cmx nmutex.cmx \
     lvmabs_types.cmx lockgen.cmx int_types.cmx
-vhdd.cmo : vhdsm.cmi vhdrpc.cmo tracelog.cmo tapdisk_listen.cmo tapdisk.cmo \
+vhdd.cmo : vhdsm.cmo vhdrpc.cmo tracelog.cmo tapdisk_listen.cmo tapdisk.cmo \
     int_server.cmo int_rpc.cmo html.cmo global.cmo fileserver.cmo \
-    fd_pass_receiver.cmo drivers.cmo attachments.cmi
+    fd_pass_receiver.cmo drivers.cmo context.cmo attachments.cmi
 vhdd.cmx : vhdsm.cmx vhdrpc.cmx tracelog.cmx tapdisk_listen.cmx tapdisk.cmx \
     int_server.cmx int_rpc.cmx html.cmx global.cmx fileserver.cmx \
-    fd_pass_receiver.cmx drivers.cmx attachments.cmx
+    fd_pass_receiver.cmx drivers.cmx context.cmx attachments.cmx
 vhdrpc.cmo : global.cmo
 vhdrpc.cmx : global.cmx
 vhdsm.cmo : vhdrpc.cmo vhd_types.cmo vhdSlave.cmo vhdMaster.cmo \
     transport.cmo slave_sr_attachments.cmo nmutex.cmo master_probe.cmo \
     lvmabs.cmi int_types.cmo html.cmo host.cmi global.cmo drivers.cmo \
-    attachments.cmi vhdsm.cmi
+    context.cmo attachments.cmi
 vhdsm.cmx : vhdrpc.cmx vhd_types.cmx vhdSlave.cmx vhdMaster.cmx \
     transport.cmx slave_sr_attachments.cmx nmutex.cmx master_probe.cmx \
     lvmabs.cmx int_types.cmx html.cmx host.cmx global.cmx drivers.cmx \
-    attachments.cmx vhdsm.cmi
+    context.cmx attachments.cmx
 vhdutil.cmo : global.cmo
 vhdutil.cmx : global.cmx
 attachments.cmi : vhd_types.cmo int_types.cmo
@@ -181,4 +181,3 @@ lvmabs_types.cmi : olvm.cmi
 ocamltest.cmi :
 olvm.cmi :
 vhd_records.cmi : vhdutil.cmo ocamltest.cmi lvmabs_types.cmi context.cmo
-vhdsm.cmi : int_types.cmo drivers.cmo context.cmo attachments.cmi

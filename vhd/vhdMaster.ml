@@ -72,9 +72,41 @@ module VDI = struct
 		ignore(Locking.slave_deactivate context metadata host id)
 
 	let thin_provision_request_more_space context metadata host ids_and_physsizes =
-		failwith "Not implemented"
-
-		  
+          fix_ctx context None;
+          let attach_infos = List.filter_map (fun (id,dm_name,physsize) ->
+            debug "Resizing vdi: %s (current physsize=%Ld)" id physsize;
+            Locking.with_resize_lock context metadata id (fun leaf_info ->
+              match leaf_info.leaf with
+              | PVhd vhduid ->
+                debug "Checking that this VDI (id:%s) is still attached to the correct host (%s)" id host;
+                if (Locking.check_i_am_attached context metadata id host) then begin
+                  let (location,size) = Nmutex.execute context metadata.m_vhd_hashtbl_lock "Need to get the 'location' field from the VHD tree"
+                    (fun () ->
+                      let vhd_info = Vhd_records.get_vhd context metadata.m_data.m_vhds vhduid in
+                      let new_size = Vhdutil.update_phys_size vhd_info.size physsize in
+                      Vhd_records.update_vhd_size context metadata.m_data.m_vhds vhduid new_size;
+                      (vhd_info.location,new_size))
+                  in
+                  match Locking.with_container_write_lock context metadata (fun container ->
+                                                          (* TODO: The next line is incorrect - physsize is the size with vhd overhead, but the function expects it without the overhead.
+                                                             Could add a function to vhdutil to do the correct calculation (ie, min_phys_size=physsize) *)
+                    let container = Lvmabs.resize context container location (Vhdutil.size_with_thin_provisioning_overhead size) in
+                    (container,Lvmabs.get_attach_info context container location)) with
+                  | _,Some (Mlvm ai) -> Some ai
+                  | _ -> None
+                end else begin
+                  debug "Not resizing: The VDI is not attached!";
+                  None
+                end
+              | PRaw x ->
+                error "Can't thin provision a raw LVM volume!";
+                None
+            ))
+            ids_and_physsizes
+          in
+          debug "Resized all";
+          attach_infos
+	    
 	let create context metadata vdi_info =
 	  let virtual_size = vdi_info.virtual_size in
 	  let sm_config = vdi_info.sm_config in
@@ -210,11 +242,11 @@ module VDI = struct
 	let compose ctx dbg metadata vdi1 vdi2 =
 	  (* VDI1 contains some diffs, and VDI2 contains the base copy. This sets
 	     VDI1's parent to be VDI2 and deletes VDI2 *)
-	  let id = vdi in
-	  fix_ctx context (Some id);
-	  check_all_hosts_present context metadata;
+	  let id = vdi1 in
+	  fix_ctx ctx (Some id);
+	  check_all_hosts_present ctx metadata;
 
-	  Locking.with_delete_lock context metadata vdi2 (fun leaf_info ->
+(*	  Locking.with_delete_lock context metadata vdi2 (fun leaf_info ->
 	    if leaf_info.attachment <> None then failwith "Can't compose onto an attached VDI";
 	    let ptr = leaf_info.leaf in
 	    match ptr with
@@ -237,7 +269,8 @@ module VDI = struct
 
 	    | PRaw x ->
 	      failwith "Not implemented"
-	  )
+	  )*)
+	  failwith "Not implemented"
 
 
 	let add_to_sm_config ctx dbg metadata vdi key value =

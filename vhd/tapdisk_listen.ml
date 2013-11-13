@@ -1,66 +1,73 @@
-(* Thread to listen to the socket that tapdisk uses for comms *)
+(* Thread to listen to shared memory that tapdisk uses as comms *)
 
 open Stringext
+open Threadext
 
 module D=Debug.Make(struct let name="tapdisk_listen" end)
 open D
 
-let bind () =
-	let path = if !Global.dummy then (Printf.sprintf "%s/tapdisk_sock" !Global.dummydir) else "/var/run/vhdd/tapdisk_sock" in
-	Unixext.mkdir_safe (Filename.dirname path) 0o700;
-	Unixext.unlink_safe path;
-	let sockaddr = Unix.ADDR_UNIX(path) in
-	let domain = Unix.PF_UNIX in
-	let sock = Unix.socket domain Unix.SOCK_STREAM 0 in
-	try
-		Unix.set_close_on_exec sock;
-		Unix.setsockopt sock Unix.SO_REUSEADDR true;
-		Unix.bind sock sockaddr;
-		Unix.listen sock 128;
-		sock
-	with e ->
-		debug "Caught exception opening tapdisk_listen socket";
-		Unix.close sock;
-		raise e
+cstruct tapdisk_stats {
+  uint32_t len;
+  uint32_t checksum;
+  uint8_t msg[256];    
+} as little_endian
 
-let handle_connection sockaddr fd =
-	debug "Tapdisk_listen handler called";
-	let text = String.create 256 in
-	while true do
-		try
-			Unixext.really_read fd text 0 256;
-			let stripped = String.strip (function '\000' -> true | c -> String.isspace c) text in
-			debug "Read: %s" stripped;
-			match String.split ',' stripped with
-				| [dev;size] ->
-					let basename = Filename.basename dev in
-					let size = Int64.of_string size in
-					begin
-						match String.split '_' basename with
-							| [host_uuid;sr_uuid;id] ->
-								(* The 'size' reported is the start of the 2 Meg chunk that's
-								   just been allocated in sectors. Need to add 2 megs, then 4k (bitmap of
-								   512 bytes plus round up to next 4k page, then add 512 for
-								   footer *)
-								let start_of_chunk_in_bytes = Int64.mul 512L size in
-								let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
-								let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
-								let with_footer = Int64.add end_of_chunk_including_bitmap 512L in
-								Int_client.Vdi.slave_set_phys_size (Int_rpc.wrap_rpc ((!Vhdrpc.local_rpc) (Uuidm.to_string (Uuidm.create Uuidm.(`V4))))) sr_uuid id with_footer;
-								debug "Done";
-							| _ -> debug "Couldn't parse tapdisk device: %s" basename
-					end
-				| _ -> debug "Protocol failure: got: %s" text
-		with e ->
-			log_backtrace ();
-			debug "Ack! caught exception: %s" (Printexc.to_string e);
-			Unix.close fd;
-			raise e
-	done
+type td_info = {
+  cs : Cstruct.t;
+  vhd_link : string;
+  mutable next_db : Int32.t
+}
+
+let h = Hashtbl.create 50
+let m = Mutex.create ()
+
+let register (sr,id) vhd_link =
+  let f = Unix.openfile (Printf.sprintf "/dev/shm/%s" (Filename.basename vhd_link)) [Unix.O_RDWR] 0 in
+  try
+    let ba = Bigarray.Array1.map_file f Bigarray.char Bigarray.c_layout true 4096 in
+    let cs = Cstruct.of_bigarray ba in
+    Mutex.execute m (fun () ->
+      Hashtbl.replace h (sr,id) {cs; next_db=0l; vhd_link;});
+    Unix.close f;
+    debug "Registered to listen to /dev/shm/%s" vhd_link
+  with e ->
+    Unix.close f;
+    raise e
+      
+let unregister (sr,id) =
+  debug "Unregistering %s/%s" sr id;
+  Mutex.execute m (fun () ->
+    Hashtbl.remove h (sr,id))
+
+let oneshot () =
+  Hashtbl.iter (fun (sr,id) st ->
+    let len = Int32.to_int (get_tapdisk_stats_len st.cs) in
+    let crc = get_tapdisk_stats_checksum st.cs in
+    let str = String.make len '\000' in
+    Cstruct.blit_to_string (get_tapdisk_stats_msg st.cs) 0 str 0 len;
+    let crc' = Zlib.update_crc Int32.zero str 0 len in
+    if crc=crc' then begin
+      let next_db = Int32.of_string str in
+      if next_db <> st.next_db then begin
+	let size = Int64.of_int32 next_db in
+	debug "Got an update: next_db = %Ld" size;
+	let start_of_chunk_in_bytes = Int64.mul 512L size in
+	let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
+	let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
+	let with_footer = Int64.add end_of_chunk_including_bitmap 512L in
+	Int_client.Vdi.slave_set_phys_size (Int_rpc.wrap_rpc ((!Vhdrpc.local_rpc) (Uuidm.to_string (Uuidm.create Uuidm.(`V4))))) sr id with_footer;
+      end
+    end) h
+
+let rec loop () =
+  try
+    Thread.delay 5.0;
+    oneshot ();
+    loop ()
+  with e ->
+    debug "Caught exception in Tapdisk_listen.loop: %s" (Printexc.to_string e);
+    loop ()
 
 let start () =
-	let sock = bind () in
-	let handler = { Server_io.name="tapdisk_listen";
-	body = handle_connection } in
-	let _ = Server_io.server handler sock in
-	()
+  Thread.create loop ()
+

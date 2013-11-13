@@ -110,7 +110,7 @@ let server_init () =
 
 	let queue_name = match !Global.host_uuid, !Global.dummy with
 	  | Some h, true -> Printf.sprintf "org.xen.xcp.storage.local_%s" h
-	  | None, _ -> "org.xen.xcp.storage.local"
+	  | _, _ -> "org.xen.xcp.storage.local"
 	in
 
 	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
@@ -120,7 +120,7 @@ let server_init () =
 
 	let queue_name = match !Global.host_uuid, !Global.dummy with
 	  | Some h, true -> Printf.sprintf "org.xen.xcp.storage.lvmnew_%s" h
-	  | None, _ -> "org.xen.xcp.storage.lvmnew"
+	  | _, _ -> "org.xen.xcp.storage.lvmnew"
 	in
 
 	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
