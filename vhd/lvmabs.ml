@@ -4,7 +4,7 @@ open Stringext
 open Int_types
 open Lvmabs_types
 
-module D = Debug.Debugger(struct let name="lvmabs" end)
+module D = Debug.Make(struct let name="lvmabs" end)
 open D
 
 exception Rtte of (container_info * location_info)
@@ -205,7 +205,7 @@ let with_active_vhd context container location_info use_tmp f =
 			f ty path)
 		(fun vg lv dm_name path ty ->
 			let map = Olvm.dm_map_of_lv vg lv in
-			let real_dm_name = if use_tmp then Uuid.to_string (Uuid.make_uuid ()) else dm_name in
+			let real_dm_name = if use_tmp then Uuidm.to_string (Uuidm.create Uuidm.(`V4)) else dm_name in
 			Host.with_active_lv (Mlvm {dmn_dm_name=real_dm_name; dmn_mapping={Camldm.m=map}}) (f ty))
 
 

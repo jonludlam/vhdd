@@ -1,9 +1,10 @@
 (* Try to detect the SR master from the attached_hosts location *)
 open Stringext
-open Smapi_types
 open Int_types
+open Context
+open Vhd_types
 
-module Debug=Debug.Debugger(struct let name="master_probe" end)
+module D=Debug.Make(struct let name="master_probe" end)
 open D
 
 exception CorruptHostAttachments
@@ -13,7 +14,7 @@ exception NoMaster
 
 let test_master ctx m sr =
 	try
-		let remote_attach_mode = Int_client.SR.mode (Int_rpc.wrap_rpc (Vhdrpc.remote_rpc ctx.c_task_id m.h_ip m.h_port)) sr in
+		let remote_attach_mode = Int_client.SR.mode (Int_rpc.wrap_rpc (Vhdrpc.remote_rpc ctx.c_task_id (match m.h_ip with Some x -> x | None -> failwith "No IP") m.h_port)) sr in
 		begin
 			match remote_attach_mode with
 				| Master -> true
@@ -31,7 +32,7 @@ let master_probe ctx driver path sr =
 				Lvmabs.init_lvm ctx (String.split ',' device)
 			| Drivers.OldLvm _ ->
 				let device = path in
-				Lvmabs.init_origlvm ctx sr.sr_uuid (String.split ',' device)
+				Lvmabs.init_origlvm ctx sr (String.split ',' device)
 			| Drivers.File _ ->
 				let path = path in
 				Lvmabs.init_fs ctx path
@@ -50,8 +51,8 @@ let master_probe ctx driver path sr =
 							| Some m -> m
 							| None -> raise NoMaster
 					in
-					debug "host_attachments read: Master is apparently at uuid=%s ip=%s port=%d" m.h_uuid m.h_ip m.h_port;
-					if test_master ctx m sr.sr_uuid then
+					debug "host_attachments read: Master is apparently at uuid=%s ip=%s port=%d" m.h_uuid (match m.h_ip with Some x -> x | None -> "Unknown") m.h_port;
+					if test_master ctx m sr then
 						m
 					else
 						raise HostAttachmentsIncorrect

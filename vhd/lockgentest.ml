@@ -1,5 +1,5 @@
 
-module D=Debug.Debugger(struct let name="lockgentest" end)
+module D=Debug.Make(struct let name="lockgentest" end)
 open D
 
 module Myops = struct

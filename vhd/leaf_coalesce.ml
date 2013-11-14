@@ -1,10 +1,9 @@
 open Threadext
 open Vhd_types
 open Int_types
-open Smapi_types
 open Vhd_records
 
-module D=Debug.Debugger(struct let name="leaf_coalesce" end)
+module D=Debug.Make(struct let name="leaf_coalesce" end)
 open D
 
 exception Cant_leaf_coalesce of string

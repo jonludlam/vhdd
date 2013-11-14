@@ -1,4 +1,3 @@
-open Smapi_types
 open Camldm
 
 exception IntError of (string * (string list))
@@ -29,7 +28,7 @@ and slave_attach_info = {
 
 type host = {
 	h_uuid : string;
-	h_ip : string;
+	h_ip : string option;
 	h_port : int;
 } with rpc
 
@@ -39,7 +38,7 @@ with rpc
 
 (** Context, used for information only *)
 type lcontext = {
-	lc_context : context;
+	lc_context : Context.t;
 	mutable lc_blocked : bool;
 	lc_reason : string;
 	lc_lock_required : string;

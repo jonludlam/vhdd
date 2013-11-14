@@ -20,19 +20,19 @@ val string_of_pointer : pointer -> string
 
 
 val of_vhds : vhd_record list -> (pointer * bool) list -> vhd_record_container
-val get_vhd : Smapi_types.context -> vhd_record_container -> string -> vhd_record
-val add_vhd : Smapi_types.context -> vhd_record_container -> string -> vhd_record -> unit
-val update_vhd_size : Smapi_types.context -> vhd_record_container -> string -> Vhdutil.size -> vhd_record
-val update_hidden : Smapi_types.context -> vhd_record_container -> pointer -> int -> unit
-val update_vhd_parent : Smapi_types.context -> vhd_record_container -> string -> pointer option -> vhd_record
-val remove_vhd : Smapi_types.context -> vhd_record_container -> string -> vhd_record
-val remove_lv : Smapi_types.context -> vhd_record_container -> pointer -> unit
-val get_vhd_hashtbl_copy : Smapi_types.context -> vhd_record_container -> (string, vhd_record) Hashtbl.t
-val get_vhd_chain : Smapi_types.context -> vhd_record_container -> string -> vhd_record list * Lvmabs_types.location_info option
-val get_children_from_pointer : Smapi_types.context -> vhd_record_container -> pointer -> (string * vhd_record) list
-val get_all_affected_vhds : Smapi_types.context -> vhd_record_container -> pointer -> string list
+val get_vhd : Context.t -> vhd_record_container -> string -> vhd_record
+val add_vhd : Context.t -> vhd_record_container -> string -> vhd_record -> unit
+val update_vhd_size : Context.t -> vhd_record_container -> string -> Vhdutil.size -> vhd_record
+val update_hidden : Context.t -> vhd_record_container -> pointer -> int -> unit
+val update_vhd_parent : Context.t -> vhd_record_container -> string -> pointer option -> vhd_record
+val remove_vhd : Context.t -> vhd_record_container -> string -> vhd_record
+val remove_lv : Context.t -> vhd_record_container -> pointer -> unit
+val get_vhd_hashtbl_copy : Context.t -> vhd_record_container -> (string, vhd_record) Hashtbl.t
+val get_vhd_chain : Context.t -> vhd_record_container -> string -> vhd_record list * Lvmabs_types.location_info option
+val get_children_from_pointer : Context.t -> vhd_record_container -> pointer -> (string * vhd_record) list
+val get_all_affected_vhds : Context.t -> vhd_record_container -> pointer -> string list
 val get_vhd_records_rpc : vhd_record_container -> Rpc.t
-val get_coalesce_info : Smapi_types.context -> vhd_record_container -> (string list * string list * string list * pointer list)
+val get_coalesce_info : Context.t -> vhd_record_container -> (string list * string list * string list * pointer list)
 
 module Tests : sig
 	val tests : Ocamltest.test

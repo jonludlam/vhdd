@@ -2,7 +2,7 @@ open Threadext
 open Smapi_types
 
 module SC=Smapi_client
-module D=Debug.Debugger(struct let name="parallel_test" end)
+module D=Debug.Make(struct let name="parallel_test" end)
 open D
 
 let measure_call intrpc fn id =

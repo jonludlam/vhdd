@@ -1,0 +1,10 @@
+*.o
+*.cmx
+*.cmi
+*.cmo
+*.cmxa
+*.cmxs
+*.cmt
+*~
+*.annot
+vhd/vhdd

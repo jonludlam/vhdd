@@ -1,7 +1,7 @@
 (* Named mutex *)
 open Threadext
 open Int_types
-module D=Debug.Debugger(struct let name="nmutex" end) 
+module D=Debug.Make(struct let name="nmutex" end) 
 open D
 
 let waiting_enabled = ref false
@@ -15,7 +15,7 @@ let wait ctx reason lock_required =
 	let context = {lc_context=ctx; lc_blocked=true; lc_reason=reason; lc_lock_required=lock_required} in
 	if !waiting_enabled then begin
 		Mutex.execute waiting_mutex (fun () ->
-			let uuid = Uuid.to_string (Uuid.make_uuid ()) in
+			let uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 			Hashtbl.replace waiting_list uuid context;
 			while context.lc_blocked do
 				Condition.wait waiting_condition waiting_mutex
@@ -70,8 +70,8 @@ let create_condition name = {
 	cn=name;
 }
 
-let dummy_hook (context : Smapi_types.context) (reason : string) (lock : string) = ()
-let dummy2_hook (context : Smapi_types.context) (reason : string) (cond : string) (lock : string) = ()
+let dummy_hook (context : Context.t) (reason : string) (lock : string) = ()
+let dummy2_hook (context : Context.t) (reason : string) (cond : string) (lock : string) = ()
 
 let lock_hook = ref dummy_hook
 let unlock_hook = ref dummy_hook

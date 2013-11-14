@@ -2,7 +2,7 @@ open Stringext
 open Listext
 open Threadext
 
-module D=Debug.Debugger(struct let name="tapdisk" end)
+module D=Debug.Make(struct let name="tapdisk" end)
 open D
 
 let dummy_vhd = "/var/run/vhdd/dummy.vhd"
@@ -89,16 +89,17 @@ let attach sr_uuid id =
 	(dev,tapdev_link)
 
 let activate dev sr_uuid id leaf ty =
+	let link = make_vhd_link sr_uuid id leaf in
 	if not (get_activated dev) then begin
-		let link = make_vhd_link sr_uuid id leaf in
 		Tapctl._open (ctx ()) dev link ty
 	end else begin
 		t_pause dev;
-		let link = make_vhd_link sr_uuid id leaf in
 		Tapctl.unpause (ctx ()) dev link ty
-	end
+	end;
+        Tapdisk_listen.register (sr_uuid,id) link
 
 let deactivate dev sr_uuid id leaf =
+	Tapdisk_listen.unregister (sr_uuid,id);
 	remove_vhd_link sr_uuid id leaf;
 	Tapctl.close (ctx ()) dev
 

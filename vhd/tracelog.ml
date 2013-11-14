@@ -1,9 +1,9 @@
 open Int_types
 open Vhd_types
-open Smapi_types
 open Threadext
 open Vhd_records
-module D=Debug.Debugger(struct let name="tracelog" end)
+open Context
+module D=Debug.Make(struct let name="tracelog" end)
 open D
 
 type smapicall_ty = { path : string; body: string; call: string }
@@ -128,7 +128,7 @@ let init () =
 	Nmutex.cond_wait_pre_hook := cond_wait_pre_hook;
 	Nmutex.cond_wait_post_hook := cond_wait_post_hook
 
-let tracelog_handler req fd =
+let tracelog_handler req fd () =
 	req.Http.Request.close <- true;
 	let str = get_txt () in
 	Http_svr.response_str req fd str

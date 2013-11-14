@@ -10,9 +10,9 @@ OCAMLDESTDIR ?= $(OCAMLLIBDIR)
 LIBOBJS = smapi_types smapi process_xmlrpc smapi_client
 INTF = $(foreach obj, $(LIBOBJS),$(obj).cmi)
 CMXS = $(foreach obj, $(LIBOBJS),$(obj).cmx)
-OCAMLC = ocamlfind ocamlc -g 
-OCAMLOPT = ocamlfind ocamlopt -g 
-COMPFLAG = -package xapi-client,stdext,rpc-light.syntax,rpc-light.json -syntax camlp4o -dtypes
+OCAMLC = ocamlfind ocamlc -g
+OCAMLOPT = ocamlfind ocamlopt -g
+COMPFLAG = -package xcp,rpclib.syntax,rpclib.json,xen-api-client,http-svr -syntax camlp4o -dtypes -thread
 
 default : smapi.cmxa
 

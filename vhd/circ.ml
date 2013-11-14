@@ -10,7 +10,7 @@
    json-encoded header
 *)
 
-module D = Debug.Debugger(struct let name="circ" end)
+module D = Debug.Make(struct let name="circ" end)
 open D
 
 exception No_data

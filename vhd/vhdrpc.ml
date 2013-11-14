@@ -1,4 +1,4 @@
-module D=Debug.Debugger(struct let name="vhdrpc" end)
+module D=Debug.Make(struct let name="vhdrpc" end)
 open D
 
 let get_headers host path content_length task_id =

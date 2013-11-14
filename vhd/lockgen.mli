@@ -49,15 +49,15 @@ module Lock :
       val create : string -> string -> state
 
 	  (** Create a string representation of the state *)
-      val to_string : Smapi_types.context -> state -> string
+      val to_string : Context.t -> state -> string
 
 	  (** Apply a function when no conflicting operations are in progress. Will 
 		  block while there is a conflict *)
       val with_op :
-        Smapi_types.context -> state -> O.operation -> (unit -> 'a) -> 'a
+        Context.t -> state -> O.operation -> (unit -> 'a) -> 'a
 
 	  (** Apply a function when no conflicting operations are in progress. Will throw
 		  'OpConflict' if there is a conflict *)
       val with_op_nowait :
-        Smapi_types.context -> state -> O.operation -> (unit -> 'a) -> 'a
+        Context.t -> state -> O.operation -> (unit -> 'a) -> 'a
     end

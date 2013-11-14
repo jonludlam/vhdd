@@ -2,11 +2,11 @@
 open Listext
 open Pervasiveext
 open Vhd_types
-open Smapi_types
 open Int_types
 open Stringext
 open Threadext
 open Vhd_records
+open Context
 
 type updates = {
 	id : int;
@@ -115,7 +115,7 @@ let vhd_to_tr k vhd =
 
 let ssa_to_tr ssa =
 	tr [td [text ssa.ssa_host.h_uuid];
-	td [text ssa.ssa_host.h_ip];
+	td [text (match ssa.ssa_host.h_ip with Some x -> x | None -> "Unknown")];
 	td [text (string_of_bool ssa.ssa_resync_required)]
 	]
 
@@ -171,11 +171,11 @@ let current_op_to_table_row id op =
 	tr [td [text id]; td [text (Jsonrpc.to_string (Vhd_types.rpc_of_slave_op op))]]
 
 let slave_to_html k metadata =
-	let inner = [span [text "SR UUID: "; text metadata.s_data.s_sr.sr_uuid; text (if metadata.s_data.s_ready then " (ready)" else " (not ready)") ]] @ 
+	let inner = [span [text "SR UUID: "; text metadata.s_data.s_sr; text (if metadata.s_data.s_ready then " (ready)" else " (not ready)") ]] @ 
 		(match metadata.s_data.s_master with
 			| Some m -> [h 2 [text "Current master"];
 			  table ((thead [tr [th [text "uuid"]; th [text "ip"]; th [text "port"]]])::
-				  [tr [td [text m.h_uuid]; td [text m.h_ip]; td [text (string_of_int m.h_port)]]])]
+				  [tr [td [text m.h_uuid]; td [text (match m.h_ip with Some x -> x | None -> "Unknown")]; td [text (string_of_int m.h_port)]]])]
 			| None -> [h 2 [text "No current master"]]) @ [			  
 			h 2 [text "Current attached VDIs"];
 			table ((thead [tr [th [text "Location"]; th [text "tapdev"]; th [text "leaf"]; th [text "LVs"]; th [text "Phys size"]; th [text "Max size"]; th [text "Activated"]]])::
@@ -201,7 +201,7 @@ let status context =
 		div ~attrs:["class",Some "attached_as_slave"] (Attachments.map_slave_srs (fun k v -> slave_to_html k v));
 	]] ()
 
-let dot_handler req fd =
+let dot_handler req fd () =
 	req.Http.Request.close <- true;
 	let context = {
 		c_driver="none";
@@ -213,7 +213,7 @@ let dot_handler req fd =
 	let path = String.split '/' req.Http.Request.uri in
 	match path with
 		| ""::"dot"::[sr_uuid] ->
-			let metadata = Attachments.gmm {sr_uuid=sr_uuid} in
+			let metadata = Attachments.gmm sr_uuid in
 			let dot = Dot.to_string context metadata in
 			let tmp = Filenameext.temp_file_in_dir "/tmp/foo" in
 			Unixext.write_string_to_file tmp dot;
@@ -222,7 +222,7 @@ let dot_handler req fd =
 		| _ ->
 			failwith "Bad request"
 
-let wait_handler req fd =
+let wait_handler req fd () =
 	req.Http.Request.close <- true;
 	let path = String.split '/' req.Http.Request.uri in
 	match path with
@@ -231,7 +231,7 @@ let wait_handler req fd =
 			Http_svr.response_str req fd "OK"
 		| _ -> failwith "Bad request"
 
-let status_handler req fd =
+let status_handler req fd () =
 	oddrow := true;
 	req.Http.Request.close <- true;
 	let context = {
@@ -261,7 +261,7 @@ let signal_slave_metadata_change metadata () =
 		incr global_id;
 		Condition.broadcast metadata_change_condition)
 
-let update_handler req fd =
+let update_handler req fd () =
 	req.Http.Request.close <- true;
 	let id = int_of_string (List.assoc "id" req.Http.Request.query) in
 	let get_updates () =

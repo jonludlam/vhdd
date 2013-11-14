@@ -1,16 +1,15 @@
 (* The master! *)
 open Int_types
-open Smapi_types
 open Vhd_types
-open Client
 open Stringext
 open Drivers
 open Threadext
 open Listext
 open Coalesce
 open Vhd_records
+open Storage_interface
 
-module D=Debug.Debugger(struct let name="vhdmaster" end)
+module D=Debug.Make(struct let name="vhdmaster" end)
 open D
 
 exception Other_master_detected of host
@@ -73,11 +72,47 @@ module VDI = struct
 		ignore(Locking.slave_deactivate context metadata host id)
 
 	let thin_provision_request_more_space context metadata host ids_and_physsizes =
-		failwith "Not implemented"
+          fix_ctx context None;
+          let attach_infos = List.filter_map (fun (id,dm_name,physsize) ->
+            debug "Resizing vdi: %s (current physsize=%Ld)" id physsize;
+            Locking.with_resize_lock context metadata id (fun leaf_info ->
+              match leaf_info.leaf with
+              | PVhd vhduid ->
+                debug "Checking that this VDI (id:%s) is still attached to the correct host (%s)" id host;
+                if (Locking.check_i_am_attached context metadata id host) then begin
+                  let (location,size) = Nmutex.execute context metadata.m_vhd_hashtbl_lock "Need to get the 'location' field from the VHD tree"
+                    (fun () ->
+                      let vhd_info = Vhd_records.get_vhd context metadata.m_data.m_vhds vhduid in
+                      let new_size = Vhdutil.update_phys_size vhd_info.size physsize in
+                      Vhd_records.update_vhd_size context metadata.m_data.m_vhds vhduid new_size;
+                      (vhd_info.location,new_size))
+                  in
+                  match Locking.with_container_write_lock context metadata (fun container ->
+                                                          (* TODO: The next line is incorrect - physsize is the size with vhd overhead, but the function expects it without the overhead.
+                                                             Could add a function to vhdutil to do the correct calculation (ie, min_phys_size=physsize) *)
+                    let container = Lvmabs.resize context container location (Vhdutil.size_with_thin_provisioning_overhead size) in
+                    (container,Lvmabs.get_attach_info context container location)) with
+                  | _,Some (Mlvm ai) -> Some ai
+                  | _ -> None
+                end else begin
+                  debug "Not resizing: The VDI is not attached!";
+                  None
+                end
+              | PRaw x ->
+                error "Can't thin provision a raw LVM volume!";
+                None
+            ))
+            ids_and_physsizes
+          in
+          debug "Resized all";
+          attach_infos
+	    
+	let create context metadata vdi_info =
+	  let virtual_size = vdi_info.virtual_size in
+	  let sm_config = vdi_info.sm_config in
 
-	let create context metadata generic_params sm_config virtual_size =
 		fix_ctx context None;
-		let location_uuid = Uuid.to_string (Uuid.make_uuid ()) in
+		let location_uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 
 		let raw =
 			if List.mem_assoc "type" sm_config
@@ -85,7 +120,7 @@ module VDI = struct
 			else false
 		in
 
-		let id = Uuid.to_string (Uuid.make_uuid ()) in
+		let id = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 
 		let (ptr,vsize,lvsize) =
 			if raw
@@ -134,37 +169,135 @@ module VDI = struct
 			end
 		in
 
-		Id_map.add_to_id_map context metadata id ptr None;
+		let smapiv2_info = {
+		  content_id="";
+		  name_label=vdi_info.name_label;
+		  name_description=vdi_info.name_description;
+		  ty=vdi_info.ty;
+		  metadata_of_pool=vdi_info.metadata_of_pool;
+		  is_a_snapshot=false;
+		  snapshot_time="";
+		  snapshot_of="";
+		  read_only=false;
+		  persistent=true;
+		  sm_config=vdi_info.sm_config;
+		} in
 
-		let uuid = Xapi.create_vdi generic_params id vsize lvsize in
+		Id_map.add_to_id_map context metadata id ptr None smapiv2_info;
 
-		Xapi.update_sr context generic_params metadata;
-
-		{vdi_uuid = Some uuid; vdi_location = id}
+		{vdi_info with vdi=id;
+		  is_a_snapshot=false;
+		  snapshot_time="";
+		  snapshot_of="";
+		  read_only=false;
+		  physical_utilisation=0L;
+		}
 
 	let update context metadata gp vdi =
-		let id = vdi.vdi_location in
+		let id = vdi in
 		fix_ctx context (Some id);
 		(* Update the virtual_size, physical_utilisation, read_only flag and sm_config map *)
 		
-		Xapi.update_vdi context gp metadata id
-						
-					
+		()
 
-	let introduce context metadata generic_params uuid sm_config id =
-		let leaf_info=Master_helpers.safe_get_leaf_info context metadata id in
-		let ptr = leaf_info.leaf in
-		match ptr with
-			| PVhd vhduid ->
-				let vhd = Vhd_records.get_vhd context metadata.m_data.m_vhds vhduid in
-				let xapi_size = Vhdutil.get_phys_size vhd.size in
-				let uuid = Xapi.create_vdi generic_params id (Vhdutil.get_virtual_size vhd.size) xapi_size in
-				{ vdi_uuid = Some uuid; vdi_location = id }
-			| PRaw x ->
-				failwith "Not implemented"
+	let vhd_info_of_leaf ctx dbg metadata container (id,leaf_info) =
+	  let phys_size,virt_size = match leaf_info.leaf with
+	    | PVhd vhduid ->
+	      let vhd = Vhd_records.get_vhd ctx metadata.m_data.m_vhds vhduid in
+	      let virtual_size = Vhdutil.get_virtual_size vhd.size in
+	      let phys_size = fst (Lvmabs.size ctx container vhd.location) in
+	      phys_size, virtual_size
+	    | PRaw location_info ->
+	      let phys_size = fst (Lvmabs.size ctx container location_info) in
+	      phys_size, phys_size
+	  in
+	  { vdi=id;
+	    content_id       = leaf_info.smapiv2_info.content_id;
+	    name_label       = leaf_info.smapiv2_info.name_label;
+	    name_description = leaf_info.smapiv2_info.name_description;
+	    ty               = leaf_info.smapiv2_info.ty;
+	    metadata_of_pool = leaf_info.smapiv2_info.metadata_of_pool;
+	    is_a_snapshot    = leaf_info.smapiv2_info.is_a_snapshot;
+	    snapshot_time    = leaf_info.smapiv2_info.snapshot_time;
+	    snapshot_of      = leaf_info.smapiv2_info.snapshot_of;
+	    read_only        = leaf_info.smapiv2_info.read_only;
+	    virtual_size     = virt_size;
+	    physical_utilisation = phys_size;
+	    persistent       = leaf_info.smapiv2_info.persistent;
+	    sm_config        = leaf_info.smapiv2_info.sm_config; }
+		  
+	let stat ctx dbg metadata vdi =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  let leaf_info = Locking.locked_get_leaf_info ctx metadata id in
+	  let container = Locking.with_container_read_lock ctx metadata (fun () -> metadata.m_data.m_vhd_container) in
+	  vhd_info_of_leaf ctx dbg metadata container (id,leaf_info)
 
-	let delete context metadata gp vdi =
-		let id = vdi.vdi_location in
+	let set_persistent ctx dbg metadata vdi persistent =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    {smapiv2_info with persistent=persistent})
+
+	let compose ctx dbg metadata vdi1 vdi2 =
+	  (* VDI1 contains some diffs, and VDI2 contains the base copy. This sets
+	     VDI1's parent to be VDI2 and deletes VDI2 *)
+	  let id = vdi1 in
+	  fix_ctx ctx (Some id);
+	  check_all_hosts_present ctx metadata;
+
+(*	  Locking.with_delete_lock context metadata vdi2 (fun leaf_info ->
+	    if leaf_info.attachment <> None then failwith "Can't compose onto an attached VDI";
+	    let ptr = leaf_info.leaf in
+	    match ptr with
+	    | PVhd vhduid ->
+	      Id_map.remove_id_from_map context metadata id;
+
+	      let vhd = Vhd_records.get_vhd context metadata.m_data.m_vhds vhduid in
+	      let (hidden,size) = Master_utils.set_hidden context metadata vhd in
+	      Vhd_records.update_hidden context metadata.m_data.m_vhds (PVhd vhduid) hidden;
+	      let vhdrec = Vhd_records.remove_vhd context metadata.m_data.m_vhds vhduid in
+
+	      Html.signal_master_metadata_change metadata ();
+
+	      ignore(Locking.with_container_write_lock context metadata (fun container ->
+		let container = Lvmabs.remove context container vhdrec.location in
+		(Lvmabs.commit context container,())));
+
+	      Html.signal_master_metadata_change metadata ()
+
+
+	    | PRaw x ->
+	      failwith "Not implemented"
+	  )*)
+	  failwith "Not implemented"
+
+
+	let add_to_sm_config ctx dbg metadata vdi key value =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    { smapiv2_info with
+	      sm_config = (key,value)::(List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config) }
+	  )
+
+	let remove_from_sm_config ctx dbg metadata vdi key =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    { smapiv2_info with
+	      sm_config = List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config }
+	  )
+
+	let set_content_id ctx dbg metadata vdi content_id =
+	  let id = vdi in
+	  fix_ctx ctx (Some id);
+	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
+	    { smapiv2_info with
+	      content_id = content_id })
+
+	let delete context metadata vdi =
+		let id = vdi in
 		fix_ctx context (Some id);
 		check_all_hosts_present context metadata;
 
@@ -191,17 +324,13 @@ module VDI = struct
 
 				| PRaw x ->
 					failwith "Not implemented"
-		);
-
-		Xapi.update_sr context gp metadata;
-
-		Xapi.forget_vdi gp
+		)
 
 	exception Parent_missing
 
 
-	let clone_inner new_reservation_override context metadata generic_params vdi =
-		let id = vdi.vdi_location in
+	let clone_inner new_reservation_override context metadata vdi =
+		let id = vdi.Storage_interface.vdi in
 		fix_ctx context (Some id);
 
 		if metadata.m_data.m_rolling_upgrade then 
@@ -210,18 +339,15 @@ module VDI = struct
 		check_all_hosts_present context metadata;
 		debug "OK";
 
-		let result = Clone.clone context metadata generic_params vdi new_reservation_override in
-		
-		Xapi.update_sr context generic_params metadata;
-
+		let result = Clone.clone context metadata vdi new_reservation_override in
 		result
 
-	let clone = clone_inner None
+	let clone context metadata vdi = clone_inner None context metadata vdi 
 
-	let snapshot = clone_inner (Some Vhdutil.Attach)
+	let snapshot context metadata vdi = clone_inner (Some Vhdutil.Attach) context metadata vdi
 
-	let resize context metadata gp vdi newsize =
-		let id = vdi.vdi_location in
+	let resize context metadata vdi newsize =
+		let id = vdi in
 		fix_ctx context (Some id);
 		let vsize = Vhdutil.roundup newsize Lvm.Constants.extent_size in
 	
@@ -248,19 +374,17 @@ module VDI = struct
 						
 		Master_utils.reattach context metadata id;
 
-		Xapi.update_vdi context gp metadata id;
+		newsize
 
-		{vdi_uuid = vdi.vdi_uuid; vdi_location = id}
-
-	let resize_online ctx metadata gp vdi newsize =
-		resize ctx metadata gp vdi newsize
+	let resize_online ctx metadata vdi newsize =
+		resize ctx metadata vdi newsize
 
 	let do_leaf_coalesce context metadata id =
 		fix_ctx context (Some id);
 		Leaf_coalesce.leaf_coalesce context metadata id
 
-	let leaf_coalesce context metadata generic_params vdi =
-		let id = vdi.vdi_location in
+	let leaf_coalesce context metadata device_config vdi =
+		let id = vdi in
 		fix_ctx context (Some id);
 		(* Grab the coalesce lock first *)
 
@@ -302,17 +426,16 @@ end
 	   done as part of the post-slave-recover sync.
 	*)
 
-	let attach context generic_params driver path sr =
+	let attach context device_config driver path sr =
 		fix_ctx context None;
-		debug "sr_sm_config: [%s]" (String.concat ";" (List.map (fun (k,v) -> Printf.sprintf "(%s,%s)" k v) generic_params.gp_sr_sm_config));
 
-		let m_rolling_upgrade = List.mem_assoc "rolling_upgrade_mode" generic_params.gp_sr_sm_config in
+		let m_rolling_upgrade = List.mem_assoc "rolling_upgrade_mode" device_config in
 		debug "m_rolling_upgrade=%b" m_rolling_upgrade;
 
 		let check container =
 			let container_sr_uuid = Lvmabs.container_sr_uuid context container in
-			if container_sr_uuid <> sr.sr_uuid then begin
-				debug "container_sr_uuid=%s expecting:%s" container_sr_uuid sr.sr_uuid;
+			if container_sr_uuid <> sr then begin
+				debug "container_sr_uuid=%s expecting:%s" container_sr_uuid sr;
 				failwith "Could't find VG"
 			end
 		in
@@ -325,7 +448,7 @@ end
 						Lvmabs.init_lvm context (String.split ',' device)
 					| OldLvm _ ->
 						let device = path in
-						Lvmabs.init_origlvm context sr.sr_uuid (String.split ',' device)
+						Lvmabs.init_origlvm context sr (String.split ',' device)
 					| File _ ->
 						let path = path in
 						Lvmabs.init_fs context path
@@ -366,10 +489,10 @@ end
 						(* If we're forcibly taking over mastership from someone else, we need to make
 						   sure it's not still the master *)
 						debug "Found that the SR believes another host is the master. Attempting to query";
-						let rpc = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc context.c_task_id h.h_ip h.h_port) in
+						let rpc = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc context.Context.c_task_id (match h.h_ip with Some x -> x | None -> "unknown")  h.h_port) in
 						let ok =
 							try
-								let old_master_mode = Int_client.SR.mode rpc sr.sr_uuid in
+								let old_master_mode = Int_client.SR.mode rpc sr in
 								debug "old_master_mode = %s" (Jsonrpc.to_string (rpc_of_attach_mode old_master_mode));
 								old_master_mode <> Master
 							with e ->
@@ -400,7 +523,7 @@ end
 				| File _ -> None
 				| _ ->
 					try
-						match List.assoc "reservation_mode" generic_params.gp_device_config with
+						match List.assoc "reservation_mode" device_config with
 							| "thin" -> Some Vhdutil.Thin
 							| "leaf" -> Some Vhdutil.Leaf
 							| "attach" -> Some Vhdutil.Attach
@@ -446,7 +569,7 @@ end
 					m_lvm_reservation_mode=reservation_mode;
 					m_rolling_upgrade=m_rolling_upgrade;
 					m_attach_finished=false;
-					m_sr_uuid=sr.sr_uuid };
+					m_sr_uuid=sr };
 			m_idx=0;
 			m_container_lock=Rwlock.create ();
 			m_id_mapping_lock=Nmutex.create "m_id_mapping_lock";
@@ -513,35 +636,35 @@ end
 						Nmutex.condition_broadcast context metadata.m_attached_hosts_condition);
 				) metadata ssa.ssa_host) ())) need_resync
 
-	let assert_can_detach context metadata generic_params =
+	let assert_can_detach context metadata device_config =
 		if metadata.m_data.m_attach_finished <> true then 
 			failwith "Can't detach when not finished attaching"
 
-	let detach context metadata generic_params =
+	let detach context metadata device_config =
 		fix_ctx context None;
 		Slave_sr_attachments.commit_attached_hosts_to_disk context metadata None; (* Commit to detaching! *)
 		Lvmabs.shutdown context metadata.m_data.m_vhd_container
 
-	let create context driver path generic_params sr size =
+	let create context driver path device_config sr size =
 		fix_ctx context None;
 		match driver with
 			| Drivers.Lvm _ ->
-				let vg_name = "VG_XenStorage-"^sr.sr_uuid in
+				let vg_name = "VG_XenStorage-"^sr in
 				let devices = String.split ',' path in
 				let _,devices_and_names = List.fold_right (fun dev (i,cur) -> (i+1,(dev,Printf.sprintf "pv%d" i)::cur)) devices (0,[]) in
 				let _ = Lvm.Vg.create_new vg_name devices_and_names in
 				()
 			| Drivers.OldLvm _ ->
-				let vg_name = "VG_XenStorage-"^sr.sr_uuid in
+				let vg_name = "VG_XenStorage-"^sr in
 				let devices = String.split ',' path in
-				Olvm.create_vg sr.sr_uuid vg_name devices
+				Olvm.create_vg sr vg_name devices
 			| Drivers.File _ ->
 				()
 
-	let delete context metadata generic_params sr path = failwith "Implemented elsewhere"			
+	let delete context metadata device_config sr path = failwith "Implemented elsewhere"			
 
 	(* The probe here is only run once the transport has been attached *)
-	let probe context driver generic_params sr_sm_config path =
+	let probe context driver device_config sr_sm_config path =
 		fix_ctx context None;
 		match driver with
 			| Lvm _ ->
@@ -605,7 +728,7 @@ end
 				List.map (fun f -> Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData f])])) srs)
 
 	(* TODO: Fix up xapi's database. This currently only kicks off the coalesce process *)
-	let scan context driver generic_params sr =
+	let scan context dbg sr =
 		fix_ctx context None;
 		let metadata = Attachments.gmm sr in
 		if not metadata.m_data.m_rolling_upgrade then begin
@@ -628,36 +751,23 @@ end
 				List.iter (fun vdi -> try ignore(VDI.do_leaf_coalesce context metadata vdi) with Leaf_coalesce.Cant_leaf_coalesce _ -> ()) contents.leaf_coalescable_ids)
 		end;
 
-		Xapi.update_sr context generic_params metadata;
+		let leaf_infos = Locking.get_all_leaf_infos context metadata in
+		let container = Locking.with_container_read_lock context metadata (fun () -> metadata.m_data.m_vhd_container) in
+		List.map (VDI.vhd_info_of_leaf context dbg metadata container) leaf_infos
 
-		""
-
-	(*    let sr = match metadata.m_sr.sr_ref with Some r -> r | None -> failwith "Need SR ref!" in
-		  let session = generic_params.session_ref in
-		  let vdis = Client.VDI.get_all_records ~rpc:xapirpc ~session_id:session in
-		  let sr_vdis = List.filter (fun (vdi,vdir) -> vdir.API.vDI_SR=sr) vdis in
-		  Hashtbl.iter (fun vhduid vhdr ->
-		  if vhdr.is_leaf then begin
-		  if List.exists (fun (vdi,vdir) -> vdir.API.vDI_location = vhdr.vhduid) sr_vdis then () else
-		  let uuid = Uuid.to_string (Uuid.make_uuid ()) in
-		  ignore(Client.VDI.db_introduce
-		  ~rpc:xapirpc ~session_id:session ~uuid:uuid ~name_label:uuid ~name_description:"Found by scan"
-		  ~sR:sr ~_type:`user ~sharable:false ~read_only:(not vhdr.is_leaf) ~other_config:[] ~location:vhdr.vhduid
-		  ~xenstore_data:[] ~sm_config:[]) end) metadata.vhds*)
-
-	let update context driver gp sr = 
+	let update context driver sr = 
 		fix_ctx context None;
 		let metadata = Attachments.gmm sr in
-		Xapi.update_sr context gp metadata
+		ignore metadata
 
 	let slave_attach context metadata tok host ids =
 		fix_ctx context None;
-		debug "Attach from host: %s, ip: %s" (host.h_uuid) (host.h_ip);
+		debug "Attach from host: %s, ip: %s" (host.h_uuid) (match host.h_ip with Some x -> x | None -> "unknown");
 		Slave_sr_attachments.slave_sr_attach context metadata host ids
 
 	let slave_detach context metadata tok host =
 		fix_ctx context None;
-		debug "Detach from host: %s, ip: %s" (host.h_uuid) (host.h_ip);
+		debug "Detach from host: %s, ip: %s" (host.h_uuid) (match host.h_ip with Some x -> x | None -> "unknown");
 		Slave_sr_attachments.slave_sr_detach context metadata host
 
 	let set_host_dead context metadata host_uuid =

@@ -1,6 +1,5 @@
 
 open Int_types
-open Smapi_types
 open Vhd_records
 
 (*type attachment = {
@@ -21,7 +20,6 @@ type operation_ty =
 	| OpAttaching
 	| OpDetaching
 	| OpReattaching
-
 with rpc
 
 module MasterOperations = struct
@@ -49,11 +47,26 @@ and activation_ty =
 	| ActiveRW of string
 	| ActiveRWRaw of string list
 
+and smapiv2_info_ty = {
+	content_id : Storage_interface.content_id;
+	name_label : string;
+	name_description : string;
+	ty : string;
+	metadata_of_pool : string;
+	is_a_snapshot : bool;
+	snapshot_time : string;
+	snapshot_of : Storage_interface.vdi;
+	read_only : bool;
+	persistent : bool;
+	sm_config : (string * string) list;
+}
+
 and leaf_info = {
 	current_operations : MLock.state; 
 	attachment : attachment_ty option;
 	active_on : activation_ty option;
 	reservation_override : Vhdutil.reservation_mode option;
+	smapiv2_info : smapiv2_info_ty;
 	leaf : pointer;
 }
 
@@ -157,7 +170,7 @@ and slave_sr_metadata_data = {
 	s_master_approved_ops : (string, slave_op) Hashtbl.t;
 	s_attached_vdis : attached_vdis_t;
 	mutable s_ready : bool;
-	s_sr : sr;
+	s_sr : Storage_interface.sr;
 	s_thin_provisioning : bool;
 	mutable s_thin_provision_request_in_progress : bool;
 } with rpc

@@ -1,19 +1,18 @@
 (* VHDD *)
-open Smapi_types
 open Stringext
 
-module D=Debug.Debugger(struct let name="vhdd" end)
+module D=Debug.Make(struct let name="vhdd" end)
 open D
 
-module P = Process_xmlrpc.Processor(Vhdsm)
-
 let server = Http_svr.Server.empty ()
+
+module S = Storage_interface.Server(Vhdsm)
 
 let read_body req fd =
 	let len = match req.Http.Request.content_length with Some x -> x | None -> failwith "Need a content length" in
 	Unixext.really_read_string fd (Int64.to_int len)
 
-let xmlrpc_handler req fd =
+let xmlrpc_handler req fd () =
 	req.Http.Request.close <- true;
 	let path = match String.split '/' req.Http.Request.uri with
 		| x::ys -> List.hd (List.rev (x::ys))
@@ -26,25 +25,23 @@ let xmlrpc_handler req fd =
 	let body = read_body req fd in
 	debug "Request: %s" body;
 
-	let xml = Xml.parse_string body in
+	let rpc = Xmlrpc.call_of_string body in
 
-	(* Extract some info from the XML before we pass it to process *)
-	let call,args = XMLRPC.From.methodCall xml in
-	let context = {
+	let context = Context.({
 		c_driver=path; 
-		c_api_call=call; 
-		c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); 
-		c_other_info=[]; } in
-	Tracelog.append context (Tracelog.SmapiCall {Tracelog.path=path; body=(Xml.to_string xml); call=call}) None;
-	Debug.associate_thread_with_task context.c_task_id;
-	let result = P.process context xml in
-	let str = Xml.to_string result in
+		c_api_call=rpc.Rpc.name; 
+		c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); 
+		c_other_info=[]; }) in
+	Tracelog.append context (Tracelog.SmapiCall {Tracelog.path=path; body=body; call=rpc.Rpc.name}) None;
+	Debug.associate_thread_with_task context.Context.c_task_id;
+	let result = S.process context rpc in
+	let str = Xmlrpc.string_of_response result in
 	Tracelog.append context (Tracelog.SmapiResult {Tracelog.result=str;}) None;
 	Tracelog.dump "/tmp/tracelog";
 	debug "Response: %s" str;
 	Http_svr.response_str req fd str
 
-let internal_handler req fd =
+let internal_handler req fd () =
 	req.Http.Request.close <- true;
 	debug "Internal handler";
 	let body = read_body req fd in
@@ -52,8 +49,8 @@ let internal_handler req fd =
 	debug "Call=%s" body;
 	(* Extract some info from the XML before we pass it to process *)
 (*	let call,args = XMLRPC.From.methodCall xml in*)
-	let context = {c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuid.to_string (Uuid.make_uuid ())); c_other_info=[] } in
-	Debug.associate_thread_with_task context.c_task_id;
+	let context = Context.({c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); c_other_info=[] }) in
+	Debug.associate_thread_with_task context.Context.c_task_id;
 	(*Tracelog.append context (Tracelog.InternalCall (body, call)) None;*)
 	let result = Int_server.process context call in
 	let str = Jsonrpc.to_string (Int_rpc.rpc_of_intrpc_response_wrapper result) in
@@ -63,7 +60,7 @@ let internal_handler req fd =
 
 let register name =
 	if not !Global.dummy then begin
-		let unix_socket_path = Smapi.unix_socket_path name in
+		let unix_socket_path = !Storage_interface.default_path in
 		Unixext.mkdir_safe (Filename.dirname unix_socket_path) 0o700;
 		Unixext.unlink_safe unix_socket_path;
 		let domain_sock = Http_svr.bind (Unix.ADDR_UNIX(unix_socket_path)) "unix-rpc" in
@@ -72,12 +69,6 @@ let register name =
 	Http_svr.Server.add_handler server Http.Post (Printf.sprintf "/%s" name) (Http_svr.FdIO xmlrpc_handler)
 
 let server_init () =
-	Logs.reset_all [ "file:/var/log/vhdd.log" ];
-
-	if !Global.dummy then begin
-		Logs.reset_all [ Printf.sprintf "file:%s/var/log/vhdd.log" (Global.get_host_local_dummydir ()) ];
-	end;
-
 	Tapdisk_listen.start ();
 
 	Tracelog.init ();
@@ -96,7 +87,7 @@ let server_init () =
 	Http_svr.Server.add_handler server Http.Post "/global" (Http_svr.FdIO internal_handler);
 
 	if !Global.enable_fileserver then
-		Http_svr.Server.add_handler server Http.Get "/" (Http_svr.BufIO (Fileserver.send_file "/" !Global.fileserver_base));
+	  Http_svr.Server.add_handler server Http.Get "/" (Http_svr.BufIO (Fileserver.send_file "/" !Global.fileserver_base));
 
 	ignore(Thread.create (fun () -> Fd_pass_receiver.start "/debug" xmlrpc_handler) ());
 	ignore(Thread.create (fun () -> Fd_pass_receiver.start "/internal" internal_handler) ());
@@ -117,14 +108,33 @@ let server_init () =
 	let driver_names = Drivers.get_all_driver_names () in
 	List.iter register driver_names;
 
+	let queue_name = match !Global.host_uuid, !Global.dummy with
+	  | Some h, true -> Printf.sprintf "org.xen.xcp.storage.local_%s" h
+	  | _, _ -> "org.xen.xcp.storage.local"
+	in
+
+	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
+	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="local"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
+	ignore(Thread.create (fun () -> Xcp_service.serve_forever service) ());
+
+
+	let queue_name = match !Global.host_uuid, !Global.dummy with
+	  | Some h, true -> Printf.sprintf "org.xen.xcp.storage.lvmnew_%s" h
+	  | _, _ -> "org.xen.xcp.storage.lvmnew"
+	in
+
+	let service = Xcp_service.make ~path:(!Storage_interface.default_path) ~queue_name
+	  ~rpc_fn:(fun s -> S.process (Context.({c_driver="lvmnew"; c_api_call=""; c_task_id=""; c_other_info=[]})) s) () in
+	ignore(Thread.create (fun () -> Xcp_service.serve_forever service) ());
+
 	Global.ready := true;
 
 	while true do
 		Thread.delay 20000.;
 	done
 
-module MLVMDebug=Debug.Debugger(struct let name="mlvm" end)
-module W=Debug.Debugger(struct let name="watchdog" end)
+module MLVMDebug=Debug.Make(struct let name="mlvm" end)
+module W=Debug.Make(struct let name="watchdog" end)
 
 let delay_on_eintr f =
   try
@@ -272,19 +282,21 @@ let _ =
 		Global.mgt_iface := Some "lo";
 		Global.pool_secret := Some "dummy";
 		Global.unsafe_mode := true;
-		Logs.reset_all [ Printf.sprintf "file:%s/var/log/vhdd.log" (Global.get_host_local_dummydir ()) ];
+		Global.nowatchdog := true;
+(*		Logs.reset_all [ Printf.sprintf "file:%s/var/log/vhdd.log" (Global.get_host_local_dummydir ()) ];*)
 		Lvm.Vg.set_dummy_mode (Printf.sprintf "%s" !Global.dummydir) (Printf.sprintf "%s/dev/mapper" (Global.get_host_uuid ())) false;
 		Tapdisk.my_context := (Tapctl.create_dummy (Global.get_host_local_dummydir ()));
 			
 	end;
 
-	Lvm.Debug.debug_hook := Some MLVMDebug.debug;
+	Lvm.Lvmdebug.debug_hook := Some MLVMDebug.debug;
+
 
 	Vhdrpc.local_rpc := Int_server.local_rpc;
 
 	if not !Global.nodaemon then (Unixext.daemonize ());
 
-	Unixext.pidfile_write !Global.pidfile;
+	if not !Global.dummy then Unixext.pidfile_write !Global.pidfile;
 
         Unixext.mkdir_rec "/var/run/sr-mount" 0o755;
 

@@ -1,10 +1,9 @@
 open Vhd_types
 open Threadext
-open Smapi_types
 open Stringext
 open Int_types
 
-module D=Debug.Debugger(struct let name="attachments" end)
+module D=Debug.Make(struct let name="attachments" end)
 open D
 
 let get_log_file () = Printf.sprintf "%s/var/run/vhdd/attachments.json" (Global.get_host_local_dummydir ())
@@ -34,6 +33,15 @@ let read_attachments () =
 				"[]"
 	in
 	sr_info_list_of_rpc (Jsonrpc.of_string a)
+
+let get_sr_info sr_uuid =
+  let attachments = read_attachments () in
+  try
+    List.find (fun sr -> sr.uuid = sr_uuid) attachments
+  with Not_found ->
+    error "Cannot find sr in list of attachments";
+    failwith "Cannot find sr in list of attachments"
+      
 
 let mutate_attachment_file f =
 	Mutex.execute mutex (fun () -> 
@@ -68,11 +76,11 @@ let detach_as_slave sr_uuid = Mutex.execute mutex (fun () -> Hashtbl.remove atta
 
 (** Get master metadata *)
 let gmm sr =
-	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_master sr.sr_uuid with Not_found -> failwith "Not attached")
+	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_master sr with Not_found -> failwith "Not attached")
 
 (** Get slave metadata *)
 let gsm sr =
-	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_slave sr.sr_uuid with Not_found -> failwith "Not attached")
+	Mutex.execute mutex (fun () -> try Hashtbl.find attached_as_slave sr with Not_found -> failwith "Not attached")
 
 (** Map over metadatas. Hold the lock while doing so... *)
 let map hashtbl fn =

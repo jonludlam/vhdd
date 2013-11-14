@@ -16,7 +16,7 @@
 open Threadext
 open Int_types
 
-module D=Debug.Debugger (struct let name="host" end)
+module D=Debug.Make (struct let name="host" end)
 open D
 
 let mutex = Mutex.create ()

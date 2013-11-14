@@ -3,7 +3,7 @@ open Int_types
 open Listext
 open Vhd_records
 
-module D=Debug.Debugger(struct let name="vhdMaster_utils" end)
+module D=Debug.Make(struct let name="vhdMaster_utils" end)
 open D
 
 (** create_child: Create a child VHD given a parent. The parameter is_attached_rw refers to the
@@ -26,7 +26,7 @@ let create_child context metadata reservation_override virtual_size parent_locat
 	debug "Create child: maybe about to create a LV, size=%Ld" lvsize;
 
 	(* The location_uuid is used by nothing else at all. *)
-	let location_uuid = Uuid.to_string (Uuid.make_uuid ()) in
+	let location_uuid = Uuidm.to_string (Uuidm.create Uuidm.(`V4)) in
 
 	let (container,location_info) =
 		Locking.with_container_write_lock context metadata (fun container ->

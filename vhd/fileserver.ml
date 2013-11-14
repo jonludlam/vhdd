@@ -20,7 +20,7 @@ open Http
 open Stringext
 open Pervasiveext
 
-module D = Debug.Debugger(struct let name="xapi" end)
+module D = Debug.Make(struct let name="xapi" end)
 open D
 
 let escape uri =
@@ -55,7 +55,7 @@ let mime_of_extension = function
     | "jpg" | "jpeg" -> "image/jpeg"
 	| _              -> application_octet_stream
 
-let send_file (uri_base: string) (dir: string) (req: Request.t) (bio: Buf_io.t) =
+let send_file (uri_base: string) (dir: string) (req: Request.t) (bio: Buf_io.t) () =
   let uri_base_len = String.length uri_base in
   let s = Buf_io.fd_of bio in
   Buf_io.assert_buffer_empty bio;

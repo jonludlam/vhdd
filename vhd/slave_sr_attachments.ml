@@ -2,7 +2,7 @@
 open Vhd_types
 open Int_types
 
-module D=Debug.Debugger(struct let name="slave_sr_attachments" end)
+module D=Debug.Make(struct let name="slave_sr_attachments" end)
 open D
 
 (* Store the attached hosts with resync_required=true (if we need to read this, resync will be required!) *)
@@ -107,7 +107,7 @@ let slave_sr_detach context metadata host =
 			slave_sr_detach_by_host_uuid context metadata host.h_uuid;
 			Nmutex.condition_broadcast context metadata.m_attached_hosts_condition;
 		end else begin
-			warn "Locking.slave_sr_detach called, but the host is not attached! (sr_uuid=%s host_uuid=%s host_ip=%s)" metadata.m_data.m_sr_uuid host.h_uuid host.h_ip;
+			warn "Locking.slave_sr_detach called, but the host is not attached! (sr_uuid=%s host_uuid=%s host_ip=%s)" metadata.m_data.m_sr_uuid host.h_uuid (match host.h_ip with Some x -> x | None -> "unknown");
 		end)
 
 let get_attached_hosts context metadata =

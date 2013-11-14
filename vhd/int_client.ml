@@ -1,11 +1,10 @@
 (* Minimal client for inter-daemon RPCs *)
 
-open Smapi_types
 open Int_types
 open Vhd_types
 open Int_rpc
 
-module D=Debug.Debugger(struct let name="int_client" end)
+module D=Debug.Make(struct let name="int_client" end)
 open D
 
 let process response =

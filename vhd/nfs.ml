@@ -1,4 +1,4 @@
-module D=Debug.Debugger(struct let name="nfs" end)
+module D=Debug.Make(struct let name="nfs" end)
 open D
 
 let mount server serverpath localpath transport =

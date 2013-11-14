@@ -34,6 +34,9 @@ val log_detachment : string -> unit
 (** Change an attachment to point to a new master *)
 val log_attachment_new_master : string -> Int_types.host option -> unit
 
+(** Get the sr_info for the specified SR *)
+val get_sr_info : string -> sr_info
+
 (** Put the master metadata into the global hashtbl *)
 val attach_as_master : string -> Vhd_types.master_sr_metadata -> unit
 
@@ -47,10 +50,10 @@ val detach_as_master : string -> unit
 val detach_as_slave : string -> unit
 
 (** Retrieve the master metadata *)
-val gmm : Smapi_types.sr -> Vhd_types.master_sr_metadata
+val gmm : Storage_interface.sr -> Vhd_types.master_sr_metadata
 
 (** Retrieve the slave metadata *)
-val gsm : Smapi_types.sr -> Vhd_types.slave_sr_metadata
+val gsm : Storage_interface.sr -> Vhd_types.slave_sr_metadata
 
 (** Map a function over the master metadatas *)
 val map_master_srs :

@@ -1,6 +1,6 @@
 (* Coalesce micro ops. Used by normal coalesce and also leaf coalesce *)
 
-val with_coalesce_lock : Smapi_types.context -> Vhd_types.master_sr_metadata ->
+val with_coalesce_lock : Context.t -> Vhd_types.master_sr_metadata ->
 	(unit -> unit) -> unit
 
 (** Resize the parent of a VHD to contain the data stored within the
@@ -11,7 +11,7 @@ val with_coalesce_lock : Smapi_types.context -> Vhd_types.master_sr_metadata ->
 	Some true means it's a leaf and attached RW, and Some false means
 	it's a leaf but either attached RO or not attached at all. Assumes
 	the LVs are not activated when called. *)
-val resize_parent : Smapi_types.context -> Vhd_types.master_sr_metadata ->
+val resize_parent : Context.t -> Vhd_types.master_sr_metadata ->
 	Vhdutil.reservation_mode option -> bool option -> string -> unit
 
 (** Move data - calls libvhd to move all of the data from a VHD into
@@ -19,11 +19,11 @@ val resize_parent : Smapi_types.context -> Vhd_types.master_sr_metadata ->
 	The arguments are the context and the path to the VHD. Assumes the
 	LVs containing both the VHD and its parent are active.  Returns
 	the number of blocks that were moved. *)
-val move_data : Smapi_types.context -> string -> int
+val move_data : Context.t -> string -> int
 
 (** Attach the VHD and move its data to its parent. Taked the 
 	context, metadata, vhduid, and returns the vhduid of the parent *)
-val attach_and_move_data : Smapi_types.context -> Vhd_types.master_sr_metadata ->
+val attach_and_move_data : Context.t -> Vhd_types.master_sr_metadata ->
 	string -> (int * Vhd_records.pointer)
 
 (** Relink children of a VHD. Takes the context, master metadata, and
@@ -31,11 +31,11 @@ val attach_and_move_data : Smapi_types.context -> Vhd_types.master_sr_metadata -
 	point to their grandparent. It then reattaches any attached VDIs
 	that had the VHD in their chain. It then resizes the grandparent
 	and reattaches again. *)
-val relink_children : Smapi_types.context -> Vhd_types.master_sr_metadata ->
+val relink_children : Context.t -> Vhd_types.master_sr_metadata ->
 	string -> unit
 
 (** Helper function that combines the resize parent and move data *)
-val resize_and_move_data : Smapi_types.context -> Vhd_types.master_sr_metadata ->
+val resize_and_move_data : Context.t -> Vhd_types.master_sr_metadata ->
 	Vhdutil.reservation_mode option -> bool option -> string -> (int * Vhd_records.pointer)
 
 (** Type representing the classification of the contents of an SR *)
@@ -59,6 +59,6 @@ type classification_t = {
 
 (** Classify the contents of an SR. Returns coalescable VHDs, leaf
 	coalescable IDs, unreachable VHDs and unreachable LVs *)
-val classify_sr_contents : Smapi_types.context -> Vhd_types.master_sr_metadata ->
+val classify_sr_contents : Context.t -> Vhd_types.master_sr_metadata ->
 	classification_t
 
