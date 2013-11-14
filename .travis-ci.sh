@@ -1,5 +1,5 @@
 # OPAM packages needed to build tests.
-OPAM_PACKAGES="lwt cstruct uuidm rpc cmdliner ounit mlvm camldm xen-api-libs-transitional camlzip xcp"
+OPAM_PACKAGES="lwt cstruct uuidm rpc cmdliner ounit mlvm camldm xen-api-libs-transitional camlzip xcp xcp-inventory"
 
 
 case "$OCAML_VERSION,$OPAM_VERSION" in
