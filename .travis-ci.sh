@@ -1,5 +1,5 @@
 # OPAM packages needed to build tests.
-OPAM_PACKAGES="lwt cstruct uuidm cmdliner ounit mlvm camldm xen-api-libs-transitional camlzip"
+OPAM_PACKAGES="lwt cstruct uuidm rpc cmdliner ounit mlvm camldm xen-api-libs-transitional camlzip xcp"
 
 
 case "$OCAML_VERSION,$OPAM_VERSION" in
@@ -14,7 +14,7 @@ esac
 
 echo "yes" | sudo add-apt-repository ppa:$ppa
 sudo apt-get update -qq
-sudo apt-get install -qq ocaml ocaml-native-compilers camlp4-extra opam libxen-dev
+sudo apt-get install -qq ocaml ocaml-native-compilers camlp4-extra opam libxen-dev libdevmapper-dev
 export OPAMYES=1
 export OPAMVERBOSE=1
 echo OCaml version
