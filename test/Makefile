@@ -65,7 +65,7 @@ SOURCES = \
 .PHONY: runtest
 
 runtest : ftests
-	./ftests -path ../vhd/vhdd
+	./ftests -path ../vhd/vhdd -p
 
 OBJS := $(foreach obj, $(SOURCES),../vhd/$(obj).cmx)
 
