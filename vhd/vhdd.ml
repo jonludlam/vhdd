@@ -302,7 +302,8 @@ let _ =
 	else 
 	  try Unixext.pidfile_write !Global.pidfile with _ -> ());
 
-        Unixext.mkdir_rec "/var/run/sr-mount" 0o755;
+        (if not !Global.dummy then
+	  Unixext.mkdir_rec "/var/run/sr-mount" 0o755);
 
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
