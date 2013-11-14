@@ -339,6 +339,20 @@ let probe ty device_config continuation =
 		  continuation (safe_assoc Drivers.localpath device_config)
 		    
 
+let zero_device dev =
+  if !Global.dummy then 
+    let dir = Printf.sprintf "%s%s" !Global.dummydir dev in
+    ignore(Unix.system (Printf.sprintf "rm -rf %s/*" dir));
+  else begin
+    let oc = Unix.openfile dev [Unix.O_RDWR] 0o000 in
+    let str = String.make 2048 '\000' in
+    let rec inner left =
+      if left=0 then () else
+	let written = Unix.write oc str 0 left in
+	inner (left - written)
+    in inner 2048
+  end
+
 let delete ty sr_uuid device_config path =
 	let env = [||] in
 
@@ -355,15 +369,15 @@ let delete ty sr_uuid device_config path =
 	match ty with
 		| Lvm _
 		| OldLvm _ ->
-			ignore(Forkhelpers.execute_command_get_output ~env "/bin/dd" ["if=/dev/zero";(Printf.sprintf "of=%s" path);"bs=512";"count=4";"oflag=direct"]);
+			zero_device path;
 			detach ty sr_uuid device_config
 		| Lvm Iscsi
 		| OldLvm Iscsi ->
-			ignore(Forkhelpers.execute_command_get_output ~env "/bin/dd" ["if=/dev/zero";(Printf.sprintf "of=%s" path);"bs=512";"count=4";"oflag=direct"]);
+			zero_device path;
 			detach ty sr_uuid device_config
 		| OldLvm Fc
 		| Lvm Fc ->
-			ignore(Forkhelpers.execute_command_get_output ~env "/bin/dd" ["if=/dev/zero";(Printf.sprintf "of=%s" path);"bs=512";"count=4";"oflag=direct"]);
+			zero_device path;
 			detach ty sr_uuid device_config
 		| File FLocal ->
 			do_file_delete ();

@@ -96,7 +96,7 @@ let activate dev sr_uuid id leaf ty =
 		t_pause dev;
 		Tapctl.unpause (ctx ()) dev link ty
 	end;
-        Tapdisk_listen.register (sr_uuid,id) link
+        if not (!Global.dummy) then Tapdisk_listen.register (sr_uuid,id) link
 
 let deactivate dev sr_uuid id leaf =
 	Tapdisk_listen.unregister (sr_uuid,id);

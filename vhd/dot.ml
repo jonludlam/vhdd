@@ -22,7 +22,8 @@ IDs
 				(shorten k) (shorten k) (Vhd_types.current_ops_to_string context v.current_operations) (Vhd_types.attachments_to_string v)) ids;
 			Printf.bprintf b "\n\t}\n";
 
-			let vhds = [] in (* *Hashtbl.fold (fun k v acc -> (k,v)::acc) metadata.m_data.m_vhds [] in**)
+			let vhd_records = Vhd_records.get_vhd_hashtbl_copy context metadata.m_data.m_vhds in 
+			let vhds = Hashtbl.fold (fun k v acc -> (k,v)::acc) vhd_records [] in
 			let vhds = List.sort (fun x y -> compare (fst x) (fst y)) vhds in
 
 			(* VHDs *)
