@@ -1,37 +1,26 @@
-coalescetest.cmo: util.cmo ../smapi/smapi_types.cmo ../smapi/smapi_client.cmo \
-    ../vhd/int_client.cmo 
-coalescetest.cmx: util.cmx ../smapi/smapi_types.cmx ../smapi/smapi_client.cmx \
-    ../vhd/int_client.cmx 
-ftests.cmo: ../vhd/vhdrpc.cmo ../vhd/vhd_types.cmo ../smapi/smapi_types.cmo \
-    ../smapi/smapi_client.cmo ../vhd/olvm.cmi ocamltest.cmi \
-    ../vhd/lvmabs_types.cmi ../vhd/lvmabs.cmi lockingtest.cmo \
+coalescetest.cmo : util.cmo ../vhd/int_client.cmo
+coalescetest.cmx : util.cmx ../vhd/int_client.cmx
+ftests.cmo : ../vhd/vhdrpc.cmo ../vhd/vhd_types.cmo ../vhd/vhd_records.cmi \
+    ../vhd/olvm.cmi ../vhd/ocamltest.cmi ../vhd/lvmabs_types.cmi \
+    ../vhd/lvmabs.cmi lockingtest.cmo ../vhd/int_types.cmo ../vhd/int_rpc.cmo \
+    ../vhd/int_client.cmo ../vhd/global.cmo ../vhd/context.cmo
+ftests.cmx : ../vhd/vhdrpc.cmx ../vhd/vhd_types.cmx ../vhd/vhd_records.cmx \
+    ../vhd/olvm.cmx ../vhd/ocamltest.cmx ../vhd/lvmabs_types.cmx \
+    ../vhd/lvmabs.cmx lockingtest.cmx ../vhd/int_types.cmx ../vhd/int_rpc.cmx \
+    ../vhd/int_client.cmx ../vhd/global.cmx ../vhd/context.cmx
+get_hidden_lvs_test.cmo : ../vhd/lvmabs.cmi
+get_hidden_lvs_test.cmx : ../vhd/lvmabs.cmx
+lockingtest.cmo : ../vhd/int_types.cmo ../vhd/int_client.cmo
+lockingtest.cmx : ../vhd/int_types.cmx ../vhd/int_client.cmx
+paralleltest.cmo : util.cmo
+paralleltest.cmx : util.cmx
+simpletest.cmo : util.cmo
+simpletest.cmx : util.cmx
+test.cmo : ../vhd/vhdrpc.cmo simpletest.cmo paralleltest.cmo \
     ../vhd/int_types.cmo ../vhd/int_rpc.cmo ../vhd/int_client.cmo \
-    ../vhd/global.cmo 
-ftests.cmx: ../vhd/vhdrpc.cmx ../vhd/vhd_types.cmx ../smapi/smapi_types.cmx \
-    ../smapi/smapi_client.cmx ../vhd/olvm.cmx ocamltest.cmx \
-    ../vhd/lvmabs_types.cmx ../vhd/lvmabs.cmx lockingtest.cmx \
+    coalescetest.cmo
+test.cmx : ../vhd/vhdrpc.cmx simpletest.cmx paralleltest.cmx \
     ../vhd/int_types.cmx ../vhd/int_rpc.cmx ../vhd/int_client.cmx \
-    ../vhd/global.cmx 
-get_hidden_lvs_test.cmo: ../smapi/smapi_types.cmo ../vhd/lvmabs.cmi 
-get_hidden_lvs_test.cmx: ../smapi/smapi_types.cmx ../vhd/lvmabs.cmx 
-lockingtest.cmo: ../smapi/smapi_types.cmo ../smapi/smapi_client.cmo \
-    ../vhd/int_types.cmo ../vhd/int_client.cmo 
-lockingtest.cmx: ../smapi/smapi_types.cmx ../smapi/smapi_client.cmx \
-    ../vhd/int_types.cmx ../vhd/int_client.cmx 
-ocamltest.cmo: ocamltest.cmi 
-ocamltest.cmx: ocamltest.cmi 
-paralleltest.cmo: util.cmo ../smapi/smapi_types.cmo ../smapi/smapi_client.cmo 
-paralleltest.cmx: util.cmx ../smapi/smapi_types.cmx ../smapi/smapi_client.cmx 
-simpletest.cmo: util.cmo ../smapi/smapi_types.cmo ../smapi/smapi_client.cmo 
-simpletest.cmx: util.cmx ../smapi/smapi_types.cmx ../smapi/smapi_client.cmx 
-test.cmo: ../vhd/vhdrpc.cmo ../smapi/smapi_types.cmo \
-    ../smapi/smapi_client.cmo simpletest.cmo paralleltest.cmo \
-    ../vhd/int_types.cmo ../vhd/int_rpc.cmo ../vhd/int_client.cmo \
-    coalescetest.cmo 
-test.cmx: ../vhd/vhdrpc.cmx ../smapi/smapi_types.cmx \
-    ../smapi/smapi_client.cmx simpletest.cmx paralleltest.cmx \
-    ../vhd/int_types.cmx ../vhd/int_rpc.cmx ../vhd/int_client.cmx \
-    coalescetest.cmx 
-util.cmo: ../vhd/extentlist.cmo 
-util.cmx: ../vhd/extentlist.cmx 
-ocamltest.cmi: 
+    coalescetest.cmx
+util.cmo : ../vhd/extentlist.cmo
+util.cmx : ../vhd/extentlist.cmx

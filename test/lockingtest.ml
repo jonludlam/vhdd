@@ -1,9 +1,7 @@
 open Threadext
-open Smapi_types
 open Int_types
 
-module SC=Smapi_client
-module D=Debug.Debugger(struct let name="parallel_test" end)
+module D=Debug.Make(struct let name="parallel_test" end)
 open D
 
 let meg = Int64.mul 1024L 1024L
@@ -32,11 +30,11 @@ let measure_call intrpc fn response id =
 	Printf.printf "id: %s took %d ops\n" id n;
 	n
     
-let lockingtest rpc testrpc intrpc gp sr =
+(*let lockingtest rpc testrpc intrpc gp sr =
   Int_client.Debug.waiting_mode_set intrpc true;
   
   let created = ref "" in
-  let create id = (SC.VDI.create (testrpc id) gp sr [] (Int64.mul meg 50L)).vdi_location in
+  let create id = (Client.VDI.create (testrpc id) gp sr [] (Int64.mul meg 50L)).vdi_location in
   let create_response loc = created := loc in
   measure_call intrpc create create_response "vdi_create";
 
@@ -70,7 +68,7 @@ let lockingtest rpc testrpc intrpc gp sr =
   SC.VDI.detach (testrpc "") gp sr !cloned;
 
   ()
-
+*)
     
 
     
