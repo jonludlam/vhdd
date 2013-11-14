@@ -282,7 +282,7 @@ let _ =
 		Global.mgt_iface := Some "lo";
 		Global.pool_secret := Some "dummy";
 		Global.unsafe_mode := true;
-		Global.nowatchdog := true;
+(*		Global.nowatchdog := true;*)
 (*		Logs.reset_all [ Printf.sprintf "file:%s/var/log/vhdd.log" (Global.get_host_local_dummydir ()) ];*)
 		Lvm.Vg.set_dummy_mode (Printf.sprintf "%s" !Global.dummydir) (Printf.sprintf "%s/dev/mapper" (Global.get_host_uuid ())) false;
 		Tapdisk.my_context := (Tapctl.create_dummy (Global.get_host_local_dummydir ()));
@@ -296,7 +296,11 @@ let _ =
 
 	if not !Global.nodaemon then (Unixext.daemonize ());
 
-	if not !Global.dummy then Unixext.pidfile_write !Global.pidfile;
+
+	(if not !Global.dummy then 
+	  Unixext.pidfile_write !Global.pidfile
+	else 
+	  try Unixext.pidfile_write !Global.pidfile with _ -> ());
 
         Unixext.mkdir_rec "/var/run/sr-mount" 0o755;
 

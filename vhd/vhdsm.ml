@@ -18,7 +18,7 @@ module Query = struct
     { driver = ctx.c_driver;
       name = ctx.c_driver;
       description = "Daemonized VHD SR";
-      vendor = "Ring 3";
+      vendor = "Citrix";
       copyright = "Citrix";
       version = "2";
       required_api_version = "1.1";
@@ -408,11 +408,9 @@ module VDI = struct
 	let get_url ctx ~dbg ~sr ~vdi =
 	  failwith "Unimplemented"
 
-	let epoch_end ctx ~dbg ~sr ~vdi =
-	  failwith "Unimplemented"
+	let epoch_end ctx ~dbg ~sr ~vdi = ()
 
-	let epoch_begin ctx ~dbg ~sr ~vdi =
-	  failwith "Unimplemented"
+	let epoch_begin ctx ~dbg ~sr ~vdi = ()
 
 	let set_persistent ctx ~dbg ~sr ~vdi ~persistent =
 	  info "API call: VDI.set_persistent sr=%s vdi=%s persistent=%b" sr vdi persistent;

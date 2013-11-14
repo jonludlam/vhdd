@@ -9,47 +9,46 @@ OCAMLDESTDIR ?= $(OCAMLLIBDIR)
 
 OCAMLC = ocamlfind ocamlc -g
 OCAMLOPT = ocamlfind ocamlopt 
-OCAMLPACKS = str,xapi-client,xmlm,xml-light2,stdext,uuid,camldm,lvm,rpc-light.syntax,rpc-light.json,netdev,threads,vhd,tapctl
-COMPFLAG = -thread -package $(OCAMLPACKS) -syntax camlp4o -I ../smapi -I ../vhd -dtypes -g
-LINKFLAG = -linkpkg ../smapi/smapi.cmxa
+OCAMLPACKS = xcp,xcp-inventory,str,uuidm,camldm,lvm,rpclib.syntax,rpclib.json,netdev,threads,vhdlib,tapctl,http-svr,xcp.storage,cstruct,cstruct.syntax,zip
+COMPFLAG = -thread -package $(OCAMLPACKS) -syntax camlp4o -I ../vhd -dtypes -g
+LINKFLAG = -linkpkg 
 SOURCES = \
+	context \
 	ocamltest \
 	circ \
 	olvm \
 	int_types \
+	extentlist \
+	int_rpc \
 	nmutex \
 	lockgen \
 	host \
 	fsutils \
 	lvmabs_types \
-	xapi_inventory \
 	global \
 	vhdutil \
-	tapdisk \
+	vhdrpc \
 	vhd_records \
 	vhd_types \
+	int_client \
+	tapdisk_listen \
+	tapdisk \
 	tracelog \
 	lvmabs \
 	scan \
 	errors \
 	drivers \
 	rwlock \
-	vhdrpc \
-	extentlist \
-	int_rpc \
 	debug_utils \
 	nfs \
 	iscsilib \
 	transport \
 	attachments \
-	int_client \
 	dot \
 	html \
 	slave_sr_attachments \
 	locking \
-	xapi \
 	int_client_utils \
-	tapdisk_listen \
 	id_map \
 	master_utils \
 	coalesce \
@@ -63,6 +62,11 @@ SOURCES = \
 	int_server \
 	fileserver 
 
+.PHONY: runtest
+
+runtest : ftests
+	./ftests -path ../vhd/vhdd
+
 OBJS := $(foreach obj, $(SOURCES),../vhd/$(obj).cmx)
 
 get_hidden_lvs_test: $(OBJS) get_hidden_lvs_test.cmx
@@ -73,10 +77,6 @@ test : $(OBJS) test.cmx util.cmx simpletest.cmx coalescetest.cmx paralleltest.cm
 
 ftests: $(OBJS) lockingtest.cmx ftests.cmx 
 	$(OCAMLOPT) $(COMPFLAG) $(LINKFLAG) -o $@ $(OBJS) lockingtest.cmx ftests.cmx
-
-#install : vhdd
-#	mkdir -p $(DESTDIR)/opt/xensource/libexec
-#	cp vhdd $(DESTDIR)/opt/xensource/libexec
 
 .SUFFIXES: .ml .mli .cmo .cmi .cmx
 
@@ -96,7 +96,7 @@ clean:
 	rm -f get_hidden_lvs_test
 
 deps : 
-	ocamlfind ocamldep -package str,xapi-client,xmlm,xml-light2,stdext,uuid,camldm,lvm,rpc-light.syntax,rpc-light.json,netdev,threads,vhd -syntax camlp4o -I ../smapi -I ../vhd  *.ml *.mli > deps
+	ocamlfind ocamldep -package str,xen-api-client,xmlm,xml-light2,stdext,uuid,camldm,lvm,rpclib.syntax,rpclib.json,netdev,threads,vhdlib,tapctl -syntax camlp4o -I ../vhd  *.ml *.mli > deps
 
 include deps
 

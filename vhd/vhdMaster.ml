@@ -187,8 +187,8 @@ module VDI = struct
 
 		{vdi_info with vdi=id;
 		  is_a_snapshot=false;
-		  snapshot_time="";
-		  snapshot_of="";
+		  snapshot_time=Date.to_string Date.never;
+		  snapshot_of="OpaqueRef:NULL";
 		  read_only=false;
 		  physical_utilisation=0L;
 		}

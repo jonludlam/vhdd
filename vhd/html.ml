@@ -217,8 +217,16 @@ let dot_handler req fd () =
 			let dot = Dot.to_string context metadata in
 			let tmp = Filenameext.temp_file_in_dir "/tmp/foo" in
 			Unixext.write_string_to_file tmp dot;
-			let stdout,stderr = Forkhelpers.execute_command_get_output "/usr/bin/dot" ["-Tpng";tmp] in
-			Http_svr.response_str ?hdrs:(Some ["Content-Type","image/png"]) req s stdout
+			let png = 
+			  if not !Global.dummy then begin
+			    let stdout,stderr = Forkhelpers.execute_command_get_output "/usr/bin/dot" ["-Tpng";tmp] in
+			    stdout
+			  end else begin
+			    let tmp2 = Filenameext.temp_file_in_dir "/tmp/foo" in
+			    ignore(Unix.system (Printf.sprintf "/usr/bin/dot -Tpng %s > %s" tmp tmp2));
+			    Unixext.string_of_file tmp2
+			  end in
+			Http_svr.response_str ?hdrs:(Some ["Content-Type","image/png"]) req s png
 		| _ ->
 			failwith "Bad request"
 
