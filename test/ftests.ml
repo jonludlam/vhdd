@@ -58,6 +58,8 @@ let get_last12 s =
 module Dummy = struct
 	let start_vhdd port host_id =
 		let pidfile = Printf.sprintf "/tmp/vhdd.pid.%s" host_id in
+		let logfile = Printf.sprintf "/tmp/vhdd.log.%s" host_id in
+		let errfile = Printf.sprintf "/tmp/vhdd.err.%s" host_id in
 		let args = [
 			"-dummy";
 			"-dummydir"; "/tmp/dummytest";
@@ -69,9 +71,9 @@ module Dummy = struct
 			"-nodaemon";
 			"-t";
 			"1>";
-			"/tmp/vhdd.log";
+			logfile;
 			"2>";
-			"/tmp/vhdd.stderr.log";
+			errfile;
 			"&"
 		      ] in
 		let cmd = String.concat " " (!vhdd_path :: args) in
@@ -94,8 +96,16 @@ module Dummy = struct
 		in
 		let myintrpc = intrpc "localhost" port in
 		let client = (module (Storage_interface.Client(struct let rpc call = myrpc call end)) : CLIENT) in
-		let rec wait_for_start () =
+		let rec wait_for_start total =
 			try
+				if total > 100 then begin
+				  debug "Error waiting for vhdd to start";
+				  let log = Unixext.string_of_file logfile in
+				  let stderr = Unixext.string_of_file errfile in
+				  Printf.printf "stderr:\n%s\n\nstdout:\n%s\n\n" stderr log;
+				  exit 1
+				    
+				end
 				ignore(Int_client.Debug.get_pid myintrpc);
 				let module Client = (val client : CLIENT) in
 				debug "Got here...";
@@ -103,9 +113,10 @@ module Dummy = struct
 			with e ->
 			        debug "Caught exception: %s" (Printexc.to_string e);
 			        debug "Backtrace: %s" (Printexc.get_backtrace ());
-				wait_for_start ()
+				Thread.delay 0.1;
+				wait_for_start (total+1)
 		in
-		wait_for_start ();
+		wait_for_start 0;
 
 		{ pid = Some pid;
 		host_id = host_id;
