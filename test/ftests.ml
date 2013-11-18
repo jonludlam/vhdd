@@ -141,13 +141,25 @@ module Dummy = struct
 		let dbg = "create_and_attach" in
 
 		let module Client = (val master.client : CLIENT) in
-		Client.SR.create ~dbg ~sr ~device_config:master_device_config ~physical_size:0L;
-		Client.SR.attach ~dbg ~sr ~device_config:master_device_config;
-		List.iter (fun slave -> 
-		  let module SC = (val slave.client : CLIENT) in
-		  SC.SR.attach ~dbg ~device_config:slave_device_config ~sr) slaves;
-
-		{ vhdds; device_config; sr; vdis=[]; }
+		try
+		  Client.SR.create ~dbg ~sr ~device_config:master_device_config ~physical_size:0L;
+		  Client.SR.attach ~dbg ~sr ~device_config:master_device_config;
+		  List.iter (fun slave -> 
+		    let module SC = (val slave.client : CLIENT) in
+		    SC.SR.attach ~dbg ~device_config:slave_device_config ~sr) slaves;
+		  
+		  { vhdds; device_config; sr; vdis=[]; }
+		with e ->
+		  Printf.printf "Caught error: %s\n" (Printexc.to_string e);
+		  let host_id = master.host_id in
+		  let pidfile = Printf.sprintf "/tmp/vhdd.pid.%s" host_id in
+		  let logfile = Printf.sprintf "/tmp/vhdd.log.%s" host_id in
+		  let errfile = Printf.sprintf "/tmp/vhdd.err.%s" host_id in
+		  let log = Unixext.string_of_file logfile in
+		  let stderr = Unixext.string_of_file errfile in
+		  Printf.printf "stderr:\n%s\n\nstdout:\n%s\n\n" stderr log;
+		  exit 1
+		  
 
 	let init () =
 		let vhdds =
