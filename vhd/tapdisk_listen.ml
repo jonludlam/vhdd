@@ -9,7 +9,7 @@ open D
 cstruct tapdisk_stats {
   uint32_t len;
   uint32_t checksum;
-  uint8_t msg[256];    
+  uint8_t msg[256]
 } as little_endian
 
 type td_info = {
