@@ -294,7 +294,7 @@ let _ =
 
 	Vhdrpc.local_rpc := Int_server.local_rpc;
 
-	if not !Global.nodaemon then (Unixext.daemonize ());
+	if not !Global.nodaemon then (Unixext.daemonize ()) else Debug.log_to_stdout ();
 
 
 	(if not !Global.dummy then 
