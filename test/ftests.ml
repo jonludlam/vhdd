@@ -87,7 +87,7 @@ module Dummy = struct
 		  failwith (Printf.sprintf "Signaled: %d" x)
 		| WSTOPPED x ->
 		  failwith (Printf.sprintf "Stopped: %d" x));
-		Thread.delay 0.1;
+		Thread.delay 0.5;
 		let ic = open_in pidfile in
 		let pid_str = input_line ic in
 		let pid = int_of_string pid_str in
