@@ -123,6 +123,7 @@ let scan () =
 							  let stem = Tapctl.get_tapdevstem (ctx ()) in
 							  let stemlen = String.length stem in
 							  let tapdev_s = String.sub dev stemlen (String.length dev - stemlen) in
+
 							  (int_of_string tapdev_s, (sr_uuid,id))::(get_tapdev_links ())
 						  with _ ->
 							  debug "Removing link";
@@ -151,6 +152,7 @@ let scan () =
 								debug "host_uuid=%s sr_uuid=%s id=%s" host_uuid sr_uuid id;
 								let (other_end_sr_uuid,other_end_id) = List.assoc (Tapctl.get_minor tapdev) tapdev_links in
 								debug "other end: sr_uuid=%s id=%s" other_end_sr_uuid other_end_id;
+								if not (!Global.dummy) then Tapdisk_listen.register (sr_uuid,id) link;
 								Some (tapdev,sr_uuid, id, Some link)
 						  | _ -> None)
 			    | None -> 

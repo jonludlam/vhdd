@@ -100,15 +100,12 @@ module Vdi = struct
 			| Nil -> ()
 			| x -> rtte call x
 
-	let thin_provision_request_more_space rpc sr_uuid host dmnaps =
-		failwith "Unimplemented"
-(*		let args = XMLRPC.To.structure
-			[ "sr_uuid", XMLRPC.To.string sr_uuid;
-			"host", XMLRPC.To.string host;
-			"dmnaps", marshal_dm_names_and_physsizes dmnaps ]
-		in
-		let methodcall = XMLRPC.To.methodCall "vdi_thin_provision_request_more_space" [args] in
-		process from_lvs (methodResponse (rpc methodcall))*)
+	let thin_provision_request_more_space rpc sr_uuid host sizes =
+	  let call = Vdi_thin_provision_request_more_space (sr_uuid,host,sizes) in
+	  match process (rpc call) with
+	  | Lvs x -> x
+	  | x -> rtte call x
+
 end
 
 module Host = struct

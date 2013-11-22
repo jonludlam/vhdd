@@ -187,7 +187,7 @@ module SR = struct
 					(* Attach the slave module in no-master mode. This is a place to
 					   stash the path info for later, and is also useful for 
 					   attach-from-config *)
-					let slave_conf = VhdSlave.SR.attach ctx path sr in
+					let slave_conf = VhdSlave.SR.attach ctx device_config path sr in
 					Attachments.attach_as_slave sr slave_conf;
 					Html.signal_slave_metadata_change slave_conf ();
 					
@@ -251,7 +251,7 @@ module SR = struct
 		maybe_add_pv_info ctx driver path sr';
 
 		try
-			let slave_conf = VhdSlave.SR.attach ctx path sr' in
+			let slave_conf = VhdSlave.SR.attach ctx device_config path sr' in
 			Attachments.attach_as_slave sr' slave_conf;
 			Html.signal_slave_metadata_change slave_conf ();
 			begin

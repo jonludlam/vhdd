@@ -44,6 +44,10 @@ type lcontext = {
 	lc_lock_required : string;
 } with rpc
 
+type vdi_size_data =  {
+  vs_id : string;
+  vs_size : int64;
+} with rpc
 
 let string_of_lv_attach_info_t t =
 	match t with

@@ -49,6 +49,7 @@ let oneshot () =
     if crc=crc' then begin
       let next_db = Int32.of_string str in
       if next_db <> st.next_db then begin
+	st.next_db <- next_db;
 	let size = Int64.of_int32 next_db in
 	debug "Got an update: next_db = %Ld" size;
 	let start_of_chunk_in_bytes = Int64.mul 512L size in
@@ -61,7 +62,7 @@ let oneshot () =
 
 let rec loop () =
   try
-    Thread.delay 5.0;
+    Thread.delay 1.0;
     oneshot ();
     loop ()
   with e ->

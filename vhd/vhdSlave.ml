@@ -515,7 +515,8 @@ module VDI = struct
 
 					Int_client.SR.thin_provision_check rpc metadata.s_data.s_sr) metadata ) ())
 		else
-			()
+		  debug "not bothing"
+
 
 	let generate_config context metadata device_config vdi =
 		let id = vdi in
@@ -577,7 +578,7 @@ module SR = struct
 	   us) to tell us if we need to change anything.
 	*)
 
-	let attach context path sr =
+	let attach context device_config path sr =
 		fix_ctx context None;
 		debug "VhdSlave.SR.attach";
 
@@ -646,6 +647,13 @@ module SR = struct
 						VDI.remove_slave_attach_info_from_disk sr id
 			) files
 		in scan_attachments ();
+
+		let s_thin_provisioning = 
+		  match List.assoc "reservation_mode" device_config with
+		  | "thin" -> true
+		  | _ -> false
+		in
+
 		let s_current_ops = Hashtbl.create 10 in
 		let s_master_approved_ops = Hashtbl.create 10 in
 		Tracelog.append context (Tracelog.Slave_s_master None) None;
@@ -667,7 +675,7 @@ module SR = struct
 				s_master_approved_ops=Hashtbl.create 10;
 				s_attached_vdis=attached_vdis;
 				s_sr=sr;
-				s_thin_provisioning=false;
+				s_thin_provisioning;
 				s_thin_provision_request_in_progress=false
 			}
 		}
@@ -759,7 +767,7 @@ module SR = struct
 										let check = Int64.sub max v.savi_phys_size in
 										debug "check=%Ld" check;
 										if check < Vhdutil.tp_lower_threshold
-										then ((k,"",v.savi_phys_size)::acc)
+										then ({vs_id=k; vs_size=v.savi_phys_size}::acc)
 										else acc) metadata.s_data.s_attached_vdis []) in
 						if List.length need_resizing > 0 then begin
 							let new_attach_infos = 
@@ -794,11 +802,16 @@ module SR = struct
 							inner ()
 						end
 					in inner ();
-					Nmutex.execute context metadata.s_mutex "Unsetting thin provision request in progress" (fun () ->
-						Tracelog.append context (Tracelog.Slave_s_thin_provision_request_in_progress false) None;
-						metadata.s_data.s_thin_provision_request_in_progress <- false;
-						Html.signal_slave_metadata_change metadata ();
-					)
+				else
+				  debug "thin provisioning not enabled";
+				
+				Nmutex.execute context metadata.s_mutex "Unsetting thin provision request in progress" (fun () ->
+				  Tracelog.append context (Tracelog.Slave_s_thin_provision_request_in_progress false) None;
+				  metadata.s_data.s_thin_provision_request_in_progress <- false;
+				  Html.signal_slave_metadata_change metadata ();
+				)
+				  
+				  
 			with e ->
 				log_backtrace ();
 				debug "Caught exception while resizing: %s" (Printexc.to_string e);

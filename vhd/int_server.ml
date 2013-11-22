@@ -55,9 +55,8 @@ let process ctx call =
 					XMLRPC.Success [result]*)
 				| Vdi_slave_set_phys_size (sr_uuid, id, size) ->
 					let () = Vhdsm.VDI.slave_set_phys_size ctx sr_uuid id size in Nil
-(*				| Vdi_thin_provision_request_more_space (sr_uuid, host, dps) ->
-
-					Lvs (Vhdsm.VDI.thin_provision_request_more_space ctx sr_uuid host dps)*)
+				| Vdi_thin_provision_request_more_space (sr_uuid, host, sizes) ->
+					Lvs (Vhdsm.VDI.thin_provision_request_more_space ctx sr_uuid host sizes)
 				| Sr_thin_provision_check (sr_uuid) ->
 					let () = Vhdsm.SR.thin_provision_check ctx sr_uuid in Nil
 				| Host_set_dead host_uuid ->

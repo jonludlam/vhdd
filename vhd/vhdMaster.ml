@@ -73,7 +73,9 @@ module VDI = struct
 
 	let thin_provision_request_more_space context metadata host ids_and_physsizes =
           fix_ctx context None;
-          let attach_infos = List.filter_map (fun (id,dm_name,physsize) ->
+          let attach_infos = List.filter_map (fun vs_size_data -> 
+	    let id = vs_size_data.vs_id in
+	    let physsize = vs_size_data.vs_size in
             debug "Resizing vdi: %s (current physsize=%Ld)" id physsize;
             Locking.with_resize_lock context metadata id (fun leaf_info ->
               match leaf_info.leaf with

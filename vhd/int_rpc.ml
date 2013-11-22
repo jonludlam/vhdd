@@ -30,7 +30,7 @@ type intrpc =
 	| Vdi_slave_reload of sr_uuid * ((vdi_id * slave_attach_info) list)
 	| Vdi_slave_leaf_coalesce_stop_and_copy of sr_uuid * vdi_id * string * string
 	| Vdi_slave_set_phys_size of sr_uuid * vdi_id * int64
-(*	| Vdi_thin_provision_request_more_space of sr_uuid * host_uuid * ((vdi_id * string * int64) list)*)
+	| Vdi_thin_provision_request_more_space of sr_uuid * host_uuid * (vdi_size_data list)
 	
 	| Host_set_dead of host_uuid
 	| Host_rolling_upgrade_finished
