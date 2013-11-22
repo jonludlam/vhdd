@@ -18,6 +18,16 @@ let fix_ctx context vdi =
 		| Some id-> Tracelog.add_to_c_other_info context "vdi" id 
 		| None -> ()
 
+let string_of_slave_operation op = match op with
+  | Attaching -> "Attaching"
+  | Reattaching -> "Reattaching"
+  | Activating -> "Activating"
+  | Deactivating -> "Deactivating"
+  | Detaching -> "Detaching"
+  | AttachAndActivating -> "AttachAndActivating"
+  | LeafCoalescing -> "LeafCoalescing"
+  | Reactivating -> "Reactivating"
+
 module VDI = struct
 
 	let commit_slave_attach_info_to_disk sr_uuid id slave_attach_info =
@@ -35,7 +45,10 @@ module VDI = struct
 	let with_op_inner context msg1 tl1 msg2 tl2 hashtbl metadata id op f =
 		debug "s_mutex lock: with_op_inner";
 		Nmutex.execute context metadata.s_mutex msg1 (fun () ->
-			if not metadata.s_data.s_ready && (not (op=Reattaching || op=AttachAndActivating)) then failwith "Not ready";
+			if not metadata.s_data.s_ready && (not (op=Reattaching || op=AttachAndActivating)) then begin
+			  debug "Failing operation %s: not ready" (string_of_slave_operation op);
+			  failwith "Not ready"
+			end;
 			debug "Checking current ops";
 			while Hashtbl.mem hashtbl id do
 				debug "Waiting for a current op to finish";
@@ -497,6 +510,7 @@ module VDI = struct
 		if check < Vhdutil.tp_threshold
 		then
 			ignore(Thread.create (fun () ->
+			  debug "thin_provision_check call thread created";
 				Int_client_utils.slave_retry_loop context [] (fun rpc -> 
 
 					Int_client.SR.thin_provision_check rpc metadata.s_data.s_sr) metadata ) ())
@@ -733,8 +747,10 @@ module SR = struct
 			debug "thin provision request is already in progress. returning"
 		end else begin
 			try
+			  debug "checkpoint 1";
 				if metadata.s_data.s_thin_provisioning then
 					let rec inner () =
+					  debug "checkpoint 2";
 						let need_resizing = Nmutex.execute context metadata.s_mutex "Checking who needs resizing" (fun () ->
 							Hashtbl.fold (fun k v acc ->
 								match v.savi_maxsize with
