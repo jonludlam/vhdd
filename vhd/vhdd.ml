@@ -59,14 +59,18 @@ let internal_handler req fd () =
 	Http_svr.response_str req fd str
 
 let register name =
+        let server = Http_svr.Server.empty () in
 	if not !Global.dummy then begin
-		let unix_socket_path = !Storage_interface.default_path in
+		let unix_socket_path = Printf.sprintf "/var/lib/xcp/sm/%s" name in
 		Unixext.mkdir_safe (Filename.dirname unix_socket_path) 0o700;
 		Unixext.unlink_safe unix_socket_path;
 		let domain_sock = Http_svr.bind (Unix.ADDR_UNIX(unix_socket_path)) "unix-rpc" in
 		Http_svr.start server domain_sock
 	end;
-	Http_svr.Server.add_handler server Http.Post (Printf.sprintf "/%s" name) (Http_svr.FdIO xmlrpc_handler)
+	Http_svr.Server.add_handler server Http.Post "/" (Http_svr.FdIO (fun req fd _ -> 
+	    let open Http.Request in 
+	    let req = {req with uri = if req.uri = "/" then (Printf.sprintf "/%s" name) else req.uri} in
+	    xmlrpc_handler req fd ()))
 
 let server_init () =
 	Tapdisk_listen.start ();
