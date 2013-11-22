@@ -22,7 +22,7 @@ let h = Hashtbl.create 50
 let m = Mutex.create ()
 
 let register (sr,id) vhd_link =
-  let f = Unix.openfile (Printf.sprintf "/dev/shm/%s" (Filename.basename vhd_link)) [Unix.O_RDWR] 0 in
+  let f = Unix.openfile (Printf.sprintf "/dev/shm/%s.stats" (Filename.basename vhd_link)) [Unix.O_RDWR] 0 in
   try
     let ba = Bigarray.Array1.map_file f Bigarray.char Bigarray.c_layout true 4096 in
     let cs = Cstruct.of_bigarray ba in
