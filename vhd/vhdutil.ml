@@ -17,10 +17,10 @@ let two_mib = mul 2L mib
 let two_mib_minus_1 = sub two_mib 1L
 
 (* Thin provisioning thresholds *)
-let tp_overhead = mul mib 100L
-let tp_threshold = mul mib 50L
-let tp_lower_threshold = mul mib 75L
-let tp_emergency_threshold = mul mib 10L
+let tp_overhead = mul mib 500L
+let tp_threshold = mul mib 250L
+let tp_lower_threshold = mul mib 375L
+let tp_emergency_threshold = mul mib 50L
 
 (* critical size is only used for thin provisioning *)
 type size = {

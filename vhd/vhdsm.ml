@@ -20,7 +20,7 @@ module Query = struct
       description = "Daemonized VHD SR";
       vendor = "Citrix";
       copyright = "Citrix";
-      version = "2";
+      version = "2.0";
       required_api_version = "1.1";
       features = [
 	"SR_PROBE";
