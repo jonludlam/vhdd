@@ -648,7 +648,7 @@ module SR = struct
 			) files
 		in scan_attachments ();
 
-		let s_thin_provisioning = 
+		let s_thin_provisioning = List.mem_assoc "reservation_mode" device_config &&
 		  match List.assoc "reservation_mode" device_config with
 		  | "thin" -> true
 		  | _ -> false
