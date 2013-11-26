@@ -1,6 +1,7 @@
 open Vhd_types
 open Int_types
 open Int_rpc
+open Context
 
 module D=Debug.Make(struct let name="int_client_utils" end)
 open D
