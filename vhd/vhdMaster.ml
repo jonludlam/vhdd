@@ -617,8 +617,11 @@ end
 		fix_ctx context None;
 		debug "Recovering any slaves";
 		let attached_hosts = Slave_sr_attachments.get_attached_hosts context metadata in
+		debug "About to get_localhost()";
 		let localhost = Global.get_localhost () in
 		let need_resync = List.filter (fun ssa -> ssa.ssa_resync_required) attached_hosts in
+		debug "Creating the attach_part_two thread";
+
 		ignore(Thread.create (fun () ->			
 			debug "attach_part_two thread created";
 			Nmutex.execute context metadata.m_attached_hosts_lock "Checking whether resync is required" (fun () ->
@@ -627,6 +630,8 @@ end
 					Nmutex.condition_wait context metadata.m_attached_hosts_condition metadata.m_attached_hosts_lock
 				done);
 			attach_part_two context metadata) ());					
+		debug "About to iterate over attached slaves";
+
 		List.iter (fun ssa ->
 			ignore(Thread.create (fun rpc ->
 				debug "Recovering slave %s" ssa.ssa_host.h_uuid;
