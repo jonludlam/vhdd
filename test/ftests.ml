@@ -133,7 +133,8 @@ module Dummy = struct
 		  intrpc = myintrpc; }
 
 	let kill_vhdd vhdd =
-		(try Int_client.Debug.die vhdd.intrpc false with _ -> ());
+	        debug "Killing vhdd";
+	  (try Int_client.Debug.die vhdd.intrpc false with e -> debug "Caught exception %s" (Printexc.to_string e));
 		(*match vhdd.pid with Some h -> ignore(Forkhelpers.waitpid h) | None -> *)
 		  Thread.delay 0.5
 
@@ -1765,6 +1766,8 @@ let _ =
 	);
 				
 	(Real.uri := Printf.sprintf "/%s" !backend);
+
+	Debug.log_to_stdout ();
 
 	Real.hosts := String.split ',' !hosts;
 
