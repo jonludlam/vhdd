@@ -130,6 +130,7 @@ let process ctx call =
 				| Debug_get_host ->
 					  Host (Global.get_host_uuid ())
 	  | Debug_die b ->
+	      debug "Got instruction to die with restart=%b" b;
 	      exit (if b then Global.restart_return_code else 0);
 		  Nil)
 		       
