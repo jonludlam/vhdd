@@ -35,6 +35,9 @@ module type CLIENT = module type of Storage_client.Client
 
 type vhdd = {
 	pid : int option;
+        errfile : string;
+	logfile : string;
+	pidfile : string;
 	host_id : string;
 	client : (module CLIENT);
 	intrpc : Int_rpc.intrpc -> Int_rpc.intrpc_response_wrapper;
@@ -56,10 +59,13 @@ let get_last12 s =
 	String.sub s (String.length s - 12) 12
 
 module Dummy = struct
+  let counter = ref 0
+
 	let start_vhdd port host_id =
-		let pidfile = Printf.sprintf "/tmp/vhdd.pid.%s" host_id in
-		let logfile = Printf.sprintf "/tmp/vhdd.log.%s" host_id in
-		let errfile = Printf.sprintf "/tmp/vhdd.err.%s" host_id in
+		let pidfile = Printf.sprintf "/tmp/vhdd.pid.%d.%s" !counter host_id in
+		let logfile = Printf.sprintf "/tmp/vhdd.log.%d.%s" !counter host_id in
+		let errfile = Printf.sprintf "/tmp/vhdd.err.%d.%s" !counter host_id in
+		
 		let args = [
 			"-dummy";
 			"-dummydir"; "/tmp/dummytest";
@@ -119,9 +125,12 @@ module Dummy = struct
 		wait_for_start 0;
 
 		{ pid = Some pid;
-		host_id = host_id;
-		client = client;
-		intrpc = myintrpc; }
+		  errfile = errfile;
+		  logfile = logfile;
+		  pidfile = pidfile;
+		  host_id = host_id;
+		  client = client;
+		  intrpc = myintrpc; }
 
 	let kill_vhdd vhdd =
 		(try Int_client.Debug.die vhdd.intrpc false with _ -> ());
@@ -152,9 +161,9 @@ module Dummy = struct
 		with e ->
 		  Printf.printf "Caught error: %s\n" (Printexc.to_string e);
 		  let host_id = master.host_id in
-		  let pidfile = Printf.sprintf "/tmp/vhdd.pid.%s" host_id in
-		  let logfile = Printf.sprintf "/tmp/vhdd.log.%s" host_id in
-		  let errfile = Printf.sprintf "/tmp/vhdd.err.%s" host_id in
+		  let pidfile = master.pidfile in
+		  let logfile = master.logfile in
+		  let errfile = master.errfile in
 		  let log = Unixext.string_of_file logfile in
 		  let stderr = Unixext.string_of_file errfile in
 		  Printf.printf "stderr:\n%s\n\nstdout:\n%s\n\n" stderr log;
@@ -165,6 +174,7 @@ module Dummy = struct
 		let vhdds =
 			(start_vhdd 4094 "1") :: (if !pool then [start_vhdd 4095 "2"] else [])
 		in
+		incr counter;
 		create_and_attach vhdds
 
 	let detach_all state =
@@ -209,6 +219,9 @@ module Real = struct
 		  {
 		    pid = None;
 		    host_id;
+		    pidfile = "";
+		    logfile = "";
+		    errfile = "";
 		    client;
 		    intrpc = myintrpc }
 		in
