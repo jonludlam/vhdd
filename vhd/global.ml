@@ -31,6 +31,7 @@ let get_mgt_iface () =
 
 let mgt_ip = ref None
 let get_mgt_ip () =
+        if !dummy then Unix.inet_addr_of_string "127.0.0.1" else
 	match !mgt_ip with
 		| None -> begin
 			let addr = Netdev.Addr.get (get_mgt_iface ()) in
