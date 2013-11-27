@@ -81,11 +81,11 @@ module Dummy = struct
 		Unix.putenv "OCAMLRUNPARAM" "b";
 		let res = Unix.system cmd in
 		(match res with
-		| WEXITED x -> 
+		| Unix.WEXITED x -> 
 		  if x=0 then () else failwith (Printf.sprintf "Exited with code: %d" x)
-		| WSIGNALED x ->
+		| Unix.WSIGNALED x ->
 		  failwith (Printf.sprintf "Signaled: %d" x)
-		| WSTOPPED x ->
+		| Unix.WSTOPPED x ->
 		  failwith (Printf.sprintf "Stopped: %d" x));
 		Thread.delay 0.5;
 		let ic = open_in pidfile in

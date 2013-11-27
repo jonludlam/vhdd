@@ -1,5 +1,6 @@
 open Threadext
 open Int_types
+open Context
 
 module D=Debug.Make(struct let name="parallel_test" end)
 open D
