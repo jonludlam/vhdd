@@ -1,4 +1,8 @@
 language: c
 script: bash -ex .travis-ci.sh
+after_failure: bash -ex .travis-ci-failure.sh
 env:
+  matrix:
   - OCAML_VERSION=4.00.1 OPAM_VERSION=1.1.0
+  global:
+    secure: SU8VwTNF/jQAppbCc07xZgWUDMmkXr5KDZHG5X/wBvN9OKI3J6TO2LDF/78y3L+Xuhc1y2Coh40MoBvwh5OIP2DC67HAK1Vs4lVrUC1QhP/65GsDr+R2Dh1ovx86Qguow+FDnwtlWacD/BjnQTZC+Oc25sXyGIzdY8I84thSy4M=
