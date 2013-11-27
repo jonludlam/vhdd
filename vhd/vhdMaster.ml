@@ -171,19 +171,19 @@ module VDI = struct
 			end
 		in
 
-		let smapiv2_info = {
+		let smapiv2_info = Vhd_types.({
 		  content_id="";
-		  name_label=vdi_info.name_label;
-		  name_description=vdi_info.name_description;
-		  ty=vdi_info.ty;
-		  metadata_of_pool=vdi_info.metadata_of_pool;
+		  name_label=vdi_info.Storage_interface.name_label;
+		  name_description=vdi_info.Storage_interface.name_description;
+		  ty=vdi_info.Storage_interface.ty;
+		  metadata_of_pool=vdi_info.Storage_interface.metadata_of_pool;
 		  is_a_snapshot=false;
 		  snapshot_time="";
 		  snapshot_of="";
 		  read_only=false;
 		  persistent=true;
-		  sm_config=vdi_info.sm_config;
-		} in
+		  sm_config=vdi_info.Storage_interface.sm_config;
+		}) in
 
 		Id_map.add_to_id_map context metadata id ptr None smapiv2_info;
 
@@ -213,20 +213,21 @@ module VDI = struct
 	      let phys_size = fst (Lvmabs.size ctx container location_info) in
 	      phys_size, phys_size
 	  in
-	  { vdi=id;
-	    content_id       = leaf_info.smapiv2_info.content_id;
-	    name_label       = leaf_info.smapiv2_info.name_label;
-	    name_description = leaf_info.smapiv2_info.name_description;
-	    ty               = leaf_info.smapiv2_info.ty;
-	    metadata_of_pool = leaf_info.smapiv2_info.metadata_of_pool;
-	    is_a_snapshot    = leaf_info.smapiv2_info.is_a_snapshot;
-	    snapshot_time    = leaf_info.smapiv2_info.snapshot_time;
-	    snapshot_of      = leaf_info.smapiv2_info.snapshot_of;
-	    read_only        = leaf_info.smapiv2_info.read_only;
+
+	  Storage_interface.({ vdi=id;
+	    content_id       = leaf_info.smapiv2_info.Vhd_types.content_id;
+	    name_label       = leaf_info.smapiv2_info.Vhd_types.name_label;
+	    name_description = leaf_info.smapiv2_info.Vhd_types.name_description;
+	    ty               = leaf_info.smapiv2_info.Vhd_types.ty;
+	    metadata_of_pool = leaf_info.smapiv2_info.Vhd_types.metadata_of_pool;
+	    is_a_snapshot    = leaf_info.smapiv2_info.Vhd_types.is_a_snapshot;
+	    snapshot_time    = leaf_info.smapiv2_info.Vhd_types.snapshot_time;
+	    snapshot_of      = leaf_info.smapiv2_info.Vhd_types.snapshot_of;
+	    read_only        = leaf_info.smapiv2_info.Vhd_types.read_only;
 	    virtual_size     = virt_size;
 	    physical_utilisation = phys_size;
-	    persistent       = leaf_info.smapiv2_info.persistent;
-	    sm_config        = leaf_info.smapiv2_info.sm_config; }
+	    persistent       = leaf_info.smapiv2_info.Vhd_types.persistent;
+	    sm_config        = leaf_info.smapiv2_info.Vhd_types.sm_config; })
 		  
 	let stat ctx dbg metadata vdi =
 	  let id = vdi in
@@ -239,7 +240,7 @@ module VDI = struct
 	  let id = vdi in
 	  fix_ctx ctx (Some id);
 	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
-	    {smapiv2_info with persistent=persistent})
+	    Vhd_types.({smapiv2_info with persistent=persistent}))
 
 	let compose ctx dbg metadata vdi1 vdi2 =
 	  (* VDI1 contains some diffs, and VDI2 contains the base copy. This sets
@@ -279,24 +280,24 @@ module VDI = struct
 	  let id = vdi in
 	  fix_ctx ctx (Some id);
 	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
-	    { smapiv2_info with
-	      sm_config = (key,value)::(List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config) }
+	    Vhd_types.({ smapiv2_info with
+	      sm_config = (key,value)::(List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config) })
 	  )
 
 	let remove_from_sm_config ctx dbg metadata vdi key =
 	  let id = vdi in
 	  fix_ctx ctx (Some id);
 	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
-	    { smapiv2_info with
-	      sm_config = List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config }
+	    Vhd_types.({ smapiv2_info with
+	      sm_config = List.filter (fun (x,y) -> x <> key) smapiv2_info.sm_config })
 	  )
 
 	let set_content_id ctx dbg metadata vdi content_id =
 	  let id = vdi in
 	  fix_ctx ctx (Some id);
 	  Id_map.update_smapiv2_info ctx metadata id (fun smapiv2_info ->
-	    { smapiv2_info with
-	      content_id = content_id })
+	    Vhd_types.({ smapiv2_info with
+	      content_id = content_id }))
 
 	let delete context metadata vdi =
 		let id = vdi in

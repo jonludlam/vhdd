@@ -101,17 +101,17 @@ let clone context metadata vdi new_reservation_override =
 
 			Storage_interface.({
 			  vdi=new_id2;
-			  content_id = smapiv2_info.content_id;
-			  name_label       = smapiv2_info.name_label;
-			  name_description = smapiv2_info.name_description;
-			  ty               = smapiv2_info.ty;
-			  metadata_of_pool = smapiv2_info.metadata_of_pool;
-			  is_a_snapshot    = smapiv2_info.is_a_snapshot;
-			  snapshot_time    = smapiv2_info.snapshot_time;
-			  snapshot_of      = smapiv2_info.snapshot_of;
-			  read_only        = smapiv2_info.read_only;
+			  content_id = smapiv2_info.Vhd_types.content_id;
+			  name_label       = smapiv2_info.Vhd_types.name_label;
+			  name_description = smapiv2_info.Vhd_types.name_description;
+			  ty               = smapiv2_info.Vhd_types.ty;
+			  metadata_of_pool = smapiv2_info.Vhd_types.metadata_of_pool;
+			  is_a_snapshot    = smapiv2_info.Vhd_types.is_a_snapshot;
+			  snapshot_time    = smapiv2_info.Vhd_types.snapshot_time;
+			  snapshot_of      = smapiv2_info.Vhd_types.snapshot_of;
+			  read_only        = smapiv2_info.Vhd_types.read_only;
 			  virtual_size     = new_vsize;
 			  physical_utilisation = lvsize2;
 			  persistent       = true;
-			  sm_config        = leaf_info.smapiv2_info.sm_config;
+			  sm_config        = leaf_info.smapiv2_info.Vhd_types.sm_config;
 			}))
