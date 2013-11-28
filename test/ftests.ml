@@ -100,7 +100,7 @@ module Dummy = struct
 		let myrpc call = Xcp_client.xml_http_rpc ~srcstr:"ftests" ~dststr:"storage" 
 		  (fun () -> Printf.sprintf "http://127.0.0.1:%d/lvmnew" port) call 
 		in
-		let myintrpc = intrpc "localhost" port in
+		let myintrpc = intrpc "127.0.0.1" port in
 		let client = (module (Storage_interface.Client(struct let rpc call = myrpc call end)) : CLIENT) in
 		let rec wait_for_start total =
 			try
