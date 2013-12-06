@@ -964,24 +964,23 @@ module Killed_operations = struct
 end
 
 module Basic_tests = struct
-	let sr_probe =
-(*		make_test_case "sr_probe"
-			"Check that a probe of a detached SR can locate the SR"
-			begin fun () ->
-				let state = (!init) () in
-				Pervasiveext.finally (fun () -> 
-					let master = List.hd state.vhdds in
-					SC.SR.detach master.rpc state.gp (Some state.sr);
-					let probe_results = SC.SR.probe master.rpc state.gp [] in
-					let xml = Xml.parse_string probe_results in
-					(match xml with
-						| Xml.Element("SRlist",[],elts) ->
-							if not (List.exists (fun elt -> match elt with Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData uuid])]) -> state.sr = uuid | _ -> false) elts) then failwith "Can't find SR!"
-						| _ -> failwith "Bad XML returned");
-					SC.SR.attach master.rpc {state.gp with gp_device_config=("SRmaster","true")::state.gp.gp_device_config} (Some state.sr);
-					Thread.delay 1.0)
-					(fun () -> (!cleanup) state)
-			end*) ()
+  let sr_probe =
+    make_test_case "sr_probe"
+      "Check that a probe of a detached SR can locate the SR"
+      begin fun () ->
+	let state = (!init) () in
+	let dbg = "probe" in
+	Pervasiveext.finally (fun () -> 
+	  let master = List.hd state.vhdds in
+	  let module SC = (val master.client : CLIENT) in
+	  SC.SR.detach ~dbg ~sr:state.sr;
+	  let probe_results = SC.SR.probe ~dbg ~device_config:state.device_config in
+	  if not (List.exists (fun sr -> sr=state.sr) probe_results.probed_srs) then
+	    failwith "Failed to find SR";
+	  SC.SR.attach ~dbg ~sr:state.sr ~device_config:(("SRmaster","true")::state.device_config);
+	  Thread.delay 1.0)
+	  (fun () -> (!cleanup) state)
+      end
 
 	let sr_delete =
 		make_test_case "sr_delete"
@@ -1308,7 +1307,7 @@ module Basic_tests = struct
 
 	let tests =
 		make_module_test_suite "Basic_tests"
-		  [(*sr_probe;*) sr_delete; sr_scan; sr_update; vdi_update; vdi_attach; vdi_activate;
+		  [sr_probe; sr_delete; sr_scan; sr_update; vdi_update; vdi_attach; vdi_activate;
 			vdi_snapshot_online; vdi_create_raw;
 			vdi_snapshot_offline; vdi_clone_online; vdi_clone_offline; (*vdi_resize_smaller;*) vdi_resize_larger;
 			(*vdi_resize_smaller_online;*) vdi_resize_larger_online]
