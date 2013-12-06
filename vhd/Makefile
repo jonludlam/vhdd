@@ -38,6 +38,7 @@ SOURCES = \
 	errors \
 	drivers \
 	rwlock \
+	vhdd_helper \
 	nfs \
 	iscsilib \
 	transport \

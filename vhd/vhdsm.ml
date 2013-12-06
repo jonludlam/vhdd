@@ -50,12 +50,13 @@ module DATA = struct include Storage_skeleton.DATA end
 let get_by_name = Storage_skeleton.get_by_name
 
 module SR = struct
+	include Storage_skeleton.SR
 	(* TODO: return more interesting configuration information *)
 
-	let probe ctx gp sr_sm_config =
+	let probe ctx ~dbg ~device_config =
 		let driver = Drivers.of_ctx ctx in
-		Transport.probe driver gp (fun path ->
-			VhdMaster.SR.probe ctx driver gp sr_sm_config path)
+		Transport.probe driver device_config (fun path ->
+			VhdMaster.SR.probe ctx driver device_config path)
 
 	let create ctx ~dbg ~sr ~device_config ~physical_size =
 		(* Fail if we've already got an SR with the same uuid attached *)

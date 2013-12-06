@@ -672,68 +672,37 @@ end
 	let delete context metadata device_config sr path = failwith "Implemented elsewhere"			
 
 	(* The probe here is only run once the transport has been attached *)
-	let probe context driver device_config sr_sm_config path =
+	let probe context driver device_config path =
 		fix_ctx context None;
 		match driver with
 			| Lvm _ ->
 				let device = path in
-				Xml.Element("SRlist",[],
-				try
-					debug "device=%s" device;
-					let container = Lvmabs.init_lvm context (String.split ',' device) in
-					let container_sr_uuid = Lvmabs.container_sr_uuid context container in
-					Lvmabs.shutdown context container;
-					[Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData container_sr_uuid])])]
-				with _ ->
-					[])
+				let probed_srs = 
+				  try
+				    debug "device=%s" device;
+				    let container = Lvmabs.init_lvm context (String.split ',' device) in
+				    let container_sr_uuid = Lvmabs.container_sr_uuid context container in
+				    Lvmabs.shutdown context container;
+				    [container_sr_uuid]
+				  with _ ->
+				    []
+				in
+				Storage_interface.({probed_srs; probed=[]; other_data=None})
 			| OldLvm _ ->
 				let device = path in
-				Xml.Element("SRlist",[],
-				try
-					debug "device=%s" device;
-					let container = Lvmabs.init_origlvm context "probe" (String.split ',' device) in
-					let container_sr_uuid = Lvmabs.container_sr_uuid context container in
-					Lvmabs.shutdown context container;
-					[Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData container_sr_uuid])])]
-				with _ ->
-					[])
-			| File Nfs ->
-				let rec inner acc dh =
-					try
-						inner ((Unix.readdir dh)::acc) dh
-					with End_of_file ->
-						acc
+				let probed_srs = 
+				  try
+				    debug "device=%s" device;
+				    let container = Lvmabs.init_origlvm context "probe" (String.split ',' device) in
+				    let container_sr_uuid = Lvmabs.container_sr_uuid context container in
+				    Lvmabs.shutdown context container;
+				    [container_sr_uuid]
+				  with _ ->
+				    []
 				in
-				let is_dir fname =
-					let st = Unix.stat (Printf.sprintf "%s/%s" path fname) in
-					match st.Unix.st_kind with
-						| Unix.S_DIR -> true
-						| _ -> false
-				in
-				let files = List.filter (fun f -> f<>"." && f<>"..") (Unixext.with_directory path (inner [])) in
-				let srs = List.filter (fun f -> (*(Uuid.is_uuid f) &&*) (is_dir f)) files in
-				Xml.Element("SRlist",[],
-				List.map (fun f -> Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData f])])) srs)
-			| File Ext ->
-				(* Nb, we don't get here - we can probe at the transport layer *)
-				Xml.Element("SRlist",[],[])
-			| File FLocal ->
-			        let rec inner acc dh =
-					try
-						inner ((Unix.readdir dh)::acc) dh
-					with End_of_file ->
-						acc
-				in
-				let is_dir fname =
-					let st = Unix.stat (Printf.sprintf "%s/%s" path fname) in
-					match st.Unix.st_kind with
-						| Unix.S_DIR -> true
-						| _ -> false
-				in
-				let files = List.filter (fun f -> f<>"." && f<>"..") (Unixext.with_directory path (inner [])) in
-				let srs = List.filter (fun f -> (*(Uuid.is_uuid f) &&*) (is_dir f)) files in
-				Xml.Element("SRlist",[],
-				List.map (fun f -> Xml.Element("SR",[],[Xml.Element("UUID",[],[Xml.PCData f])])) srs)
+				Storage_interface.({probed_srs; probed=[]; other_data=None})
+			| File _ ->
+			  failwith "Unimplemented"
 
 	(* TODO: Fix up xapi's database. This currently only kicks off the coalesce process *)
 	let scan context dbg sr =

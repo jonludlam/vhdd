@@ -40,6 +40,7 @@ SOURCES = \
 	drivers \
 	rwlock \
 	debug_utils \
+	vhdd_helper \
 	nfs \
 	iscsilib \
 	transport \
