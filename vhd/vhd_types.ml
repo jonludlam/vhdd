@@ -179,7 +179,6 @@ type slave_sr_metadata = {
 	mutable s_idx : int;
 	s_mutex : Nmutex.t;
 	s_condition : Nmutex.cond;
-	mutable s_rpc : string -> Rpc.t -> Rpc.t;
 	s_data : slave_sr_metadata_data;
 } 
 

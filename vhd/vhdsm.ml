@@ -76,8 +76,7 @@ module SR = struct
 
 	let update ctx sr = VhdMaster.SR.update ctx (Drivers.of_ctx ctx) sr
 
-	let mode ctx sr_uuid =
-		let sr = sr_uuid in
+	let mode ctx ~sr =
 		let slave_metadata = try Some (Attachments.gsm sr) with _ -> None in
 		let master_metadata = try Some (Attachments.gmm sr) with _ -> None in
 		match master_metadata, slave_metadata with
@@ -115,7 +114,7 @@ module SR = struct
 					Attachments.attach_as_master sr master_conf;
 					Html.signal_master_metadata_change master_conf ();
 
-					slave_conf.Vhd_types.s_rpc <- (!Vhdrpc.local_rpc);
+					(*slave_conf.Vhd_types.s_rpc <- (!Vhdrpc.local_rpc);*)
 
 					(* Now, if we had logged any slaves as being attached, recover them *)
 					VhdMaster.SR.recover_slaves ctx master_conf;
@@ -128,7 +127,7 @@ module SR = struct
 
 				| Slave (Some host) ->
 
-					slave_conf.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task (match host.h_ip with Some x -> x | None -> "Unknown")  host.h_port);
+					(*slave_conf.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task (match host.h_ip with Some x -> x | None -> "Unknown")  host.h_port);*)
 
 					let reg () =
 						VhdSlave.SR.register_with_master ctx slave_conf host;
@@ -334,23 +333,23 @@ module SR = struct
 
 	(* These are internal calls that occur as part of a SR.attach on a
 	   slave.  *)
-	let slave_attach context tok sr host ids = VhdMaster.SR.slave_attach context (Attachments.gmm sr) tok host ids
-	let slave_detach context tok sr host = VhdMaster.SR.slave_detach context (Attachments.gmm sr) tok host
+	let slave_attach context ~sr ~host ~vdis = VhdMaster.SR.slave_attach context (Attachments.gmm sr) "" host vdis
+	let slave_detach context ~sr ~host = VhdMaster.SR.slave_detach context (Attachments.gmm sr) "" host
 
 	(* An internal call used as part of the attach process. This is
 	   called on a slave when the master has restarted and is
 	   reattaching its SRs. *)
-	let slave_recover ctx tok sr master =
+	let slave_recover ctx ~sr ~master =
 		let metadata = Attachments.gsm sr in
-		if master.h_uuid = Global.get_host_uuid () then begin
+		(*if master.h_uuid = Global.get_host_uuid () then begin
 		  metadata.Vhd_types.s_rpc <- (!Vhdrpc.local_rpc)
 		end else begin 
 		  metadata.Vhd_types.s_rpc <- (fun task -> Vhdrpc.remote_rpc task (match master.h_ip with Some x -> x | None -> "unknown") master.h_port)
-		end;
-		VhdSlave.SR.slave_recover ctx metadata tok master
+		end;*)
+		VhdSlave.SR.slave_recover ctx metadata "" master
 
 	(* Part of the infrastructure to support thin provisioning *)
-	let thin_provision_check ctx sr = VhdSlave.SR.thin_provision_check ctx (Attachments.gsm sr)
+	let thin_provision_check ctx ~sr = VhdSlave.SR.thin_provision_check ctx (Attachments.gsm sr)
 
 	let list context ~dbg =
 	  let m_srs = Attachments.map_master_srs (fun k v -> k) in
@@ -482,46 +481,45 @@ module VDI = struct
 		let metadata = Attachments.gmm sr in
 		VhdMaster.VDI.leaf_coalesce ctx metadata gp vdi
 
-	let slave_attach ctx host sr_uuid id writable is_reattach =
-		let metadata = Attachments.gmm sr_uuid in
-		VhdMaster.VDI.slave_attach ctx metadata host id writable is_reattach
+	let slave_attach ctx ~host_uuid ~sr ~vdi ~writable ~is_reattach =
+		let metadata = Attachments.gmm sr in
+		VhdMaster.VDI.slave_attach ctx metadata host_uuid vdi writable is_reattach
 
-	let get_slave_attach_info ctx sr_uuid id =
-		let metadata = Attachments.gmm sr_uuid in
-		VhdMaster.VDI.get_slave_attach_info ctx metadata id 
+	let get_slave_attach_info ctx ~sr ~vdi =
+		let metadata = Attachments.gmm sr in
+		VhdMaster.VDI.get_slave_attach_info ctx metadata vdi
 
-	let slave_detach ctx host sr_uuid id =
-		let metadata = Attachments.gmm sr_uuid in
-		VhdMaster.VDI.slave_detach ctx metadata host id
+	let slave_detach ctx ~host_uuid ~sr ~vdi =
+		let metadata = Attachments.gmm sr in
+		VhdMaster.VDI.slave_detach ctx metadata host_uuid vdi
 
-	let slave_activate ctx host sr_uuid id is_reactivate =
-		let metadata = Attachments.gmm sr_uuid in
-		VhdMaster.VDI.slave_activate ctx metadata host id is_reactivate
+	let slave_activate ctx ~host_uuid ~sr ~vdi ~is_reactivate =
+		let metadata = Attachments.gmm sr in
+		VhdMaster.VDI.slave_activate ctx metadata host_uuid vdi is_reactivate
 
-	let slave_deactivate ctx host sr_uuid id =
-		let metadata = Attachments.gmm sr_uuid in
-		VhdMaster.VDI.slave_deactivate ctx metadata host id
+	let slave_deactivate ctx ~host_uuid ~sr ~vdi =
+		let metadata = Attachments.gmm sr in
+		VhdMaster.VDI.slave_deactivate ctx metadata host_uuid vdi
 
-	let slave_reload ctx sr_uuid ids =
-		let metadata = Attachments.gsm sr_uuid in
-		VhdSlave.VDI.slave_reload ctx metadata ids
+	let slave_reload ctx ~sr ~vdis =
+		let metadata = Attachments.gsm sr in
+		VhdSlave.VDI.slave_reload ctx metadata vdis
 
-	let slave_leaf_coalesce_stop_and_copy ctx sr_uuid id leaf_path new_leaf_path =
-		let metadata = Attachments.gsm sr_uuid in
-		VhdSlave.VDI.slave_leaf_coalesce_stop_and_copy ctx metadata id leaf_path new_leaf_path
+	let slave_leaf_coalesce_stop_and_copy ctx ~sr ~vdi ~leaf_path ~new_leaf_path =
+		let metadata = Attachments.gsm sr in
+		VhdSlave.VDI.slave_leaf_coalesce_stop_and_copy ctx metadata vdi leaf_path new_leaf_path
 
 	let external_clone ctx sr_uuid filename =
 		let metadata = Attachments.gmm sr_uuid in
 		VhdMaster.VDI.external_clone ctx metadata filename
 
-	let slave_set_phys_size ctx sr_uuid id size =
-		let metadata = Attachments.gsm sr_uuid in
-		VhdSlave.VDI.slave_set_phys_size ctx metadata id size
+	let slave_set_phys_size ctx ~sr ~vdi ~size =
+		let metadata = Attachments.gsm sr in
+		VhdSlave.VDI.slave_set_phys_size ctx metadata vdi size
 
-	let thin_provision_request_more_space ctx sr_uuid host dmnaps =
-		debug "sr_uuid=%s" sr_uuid;
-		let metadata = Attachments.gmm sr_uuid in
-		VhdMaster.VDI.thin_provision_request_more_space ctx metadata host dmnaps
+	let thin_provision_request_more_space ctx ~sr ~host_uuid ~sizes =
+		let metadata = Attachments.gmm sr in
+		VhdMaster.VDI.thin_provision_request_more_space ctx metadata host_uuid sizes
 
 	let attach_from_config ctx gp sr vdi config =
 		SR.attach_nomaster ctx gp sr;
@@ -552,11 +550,65 @@ module Host = struct
 end
 
 module Debug = struct
-	let vdi_get_leaf_path context sr_uuid id =
-		let metadata = Attachments.gsm sr_uuid in
-		Nmutex.execute context metadata.Vhd_types.s_mutex "Getting leaf path"
-			(fun () ->
-				let savi = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis id in
-				savi.Vhd_types.savi_link)
-
+  let waiting_locks_get ctx () = Nmutex.get_waiting_list ()
+  let waiting_lock_unwait ctx ~lock = Nmutex.unwait lock
+  let waiting_mode_set ctx ~mode = Nmutex.set_waiting_mode mode
+  let vdi_get_leaf_path ctx ~sr ~vdi =
+    let metadata = Attachments.gsm sr in
+    Nmutex.execute ctx metadata.Vhd_types.s_mutex "Getting leaf path"
+      (fun () ->
+	let savi = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis vdi in
+	savi.Vhd_types.savi_link)
+  let die ctx ~restart = 
+    debug "Got instruction to die with restart=%b%!" restart;
+    ignore(exit (if restart then Global.restart_return_code else 0))
+  let get_id_to_leaf_map ctx ~sr =
+    let metadata = Attachments.gmm sr in
+    Mutex.execute metadata.Vhd_types.m_id_mapping_lock.Nmutex.m (fun () ->
+      Hashtbl.copy metadata.Vhd_types.m_data.Vhd_types.m_id_to_leaf_mapping)
+  let get_vhds ctx ~sr =
+    let metadata = Attachments.gmm sr in
+    Vhd_records.get_vhd_records metadata.Vhd_types.m_data.Vhd_types.m_vhds
+  let get_master_metadata ctx ~sr =
+    let metadata = Attachments.gmm sr in
+    metadata.Vhd_types.m_data
+  let get_slave_metadata ctx ~sr =
+    let metadata = Attachments.gsm sr in
+    metadata.Vhd_types.s_data
+  let get_attached_vdis ctx ~sr =
+    let metadata = Attachments.gsm sr in
+    Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () ->
+      Hashtbl.copy metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis)
+  let get_vhd_container ctx ~sr =
+    let metadata = Attachments.gmm sr in
+    metadata.Vhd_types.m_data.Vhd_types.m_vhd_container
+  let get_pid ctx () =
+    Unix.getpid ()
+  let get_attach_finished ctx ~sr = 
+    let metadata = Attachments.gmm sr in
+    metadata.Vhd_types.m_data.Vhd_types.m_attach_finished
+  let slave_get_leaf_vhduid ctx ~sr ~vdi =
+    let metadata = Attachments.gsm sr in
+    Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () ->
+      let v = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis vdi in
+      let leaf_path = v.Vhd_types.savi_attach_info.Int_types.sa_leaf_path in
+      Vhdutil.with_vhd leaf_path false (fun vhd -> 
+	Vhd.get_uid vhd))
+  let write_junk ctx ~sr ~vdi ~size ~n ~current = 
+    debug "Writing junk";
+    let metadata = Attachments.gsm sr in
+    Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () -> 
+      let v = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis vdi in
+      let path = v.Vhd_types.savi_endpoint in
+      if !Global.dummy then [] else Debug_utils.write_junk path size n current)
+  let check_junk ctx ~sr ~vdi ~current =
+    debug "Checking junk";
+    let metadata = Attachments.gsm sr in
+    Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () -> 
+      let v = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis vdi in
+      let path = v.Vhd_types.savi_endpoint in
+      if !Global.dummy then () else Debug_utils.check_junk path current);
+    debug "Junk OK (%d)" (List.length current)
+  let get_host ctx () = Global.get_host_uuid ()
+  let get_ready ctx () = !Global.ready     
 end

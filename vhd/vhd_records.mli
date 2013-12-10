@@ -31,7 +31,7 @@ val get_vhd_hashtbl_copy : Context.t -> vhd_record_container -> (string, vhd_rec
 val get_vhd_chain : Context.t -> vhd_record_container -> string -> vhd_record list * Lvmabs_types.location_info option
 val get_children_from_pointer : Context.t -> vhd_record_container -> pointer -> (string * vhd_record) list
 val get_all_affected_vhds : Context.t -> vhd_record_container -> pointer -> string list
-val get_vhd_records_rpc : vhd_record_container -> Rpc.t
+val get_vhd_records : vhd_record_container -> vhd_record_container
 val get_coalesce_info : Context.t -> vhd_record_container -> (string list * string list * string list * pointer list)
 
 module Tests : sig

@@ -49,21 +49,21 @@ int_client.cmo : vhd_types.cmo vhd_records.cmi lvmabs_types.cmi \
 int_client.cmx : vhd_types.cmx vhd_records.cmx lvmabs_types.cmx \
     int_types.cmx int_rpc.cmx global.cmx
 int_client_utils.cmo : vhdrpc.cmo vhd_types.cmo tracelog.cmo \
-    slave_sr_attachments.cmo int_types.cmo int_rpc.cmo global.cmo
+    slave_sr_attachments.cmo int_types.cmo int_rpc.cmo global.cmo context.cmo
 int_client_utils.cmx : vhdrpc.cmx vhd_types.cmx tracelog.cmx \
-    slave_sr_attachments.cmx int_types.cmx int_rpc.cmx global.cmx
-int_rpc.cmo : int_types.cmo extentlist.cmo
-int_rpc.cmx : int_types.cmx extentlist.cmx
-int_server.cmo : vhdutil.cmo vhdsm.cmo vhd_types.cmo vhd_records.cmi \
-    nmutex.cmo lvmabs_types.cmi int_types.cmo int_rpc.cmo global.cmo \
-    debug_utils.cmo context.cmo attachments.cmi
-int_server.cmx : vhdutil.cmx vhdsm.cmx vhd_types.cmx vhd_records.cmx \
-    nmutex.cmx lvmabs_types.cmx int_types.cmx int_rpc.cmx global.cmx \
-    debug_utils.cmx context.cmx attachments.cmx
+    slave_sr_attachments.cmx int_types.cmx int_rpc.cmx global.cmx context.cmx
+int_rpc.cmo : vhd_types.cmo vhd_records.cmi lvmabs_types.cmi junk.cmo \
+    context.cmo
+int_rpc.cmx : vhd_types.cmx vhd_records.cmx lvmabs_types.cmx junk.cmx \
+    context.cmx
+int_server.cmo : vhdsm.cmo int_types.cmo int_rpc.cmo context.cmo
+int_server.cmx : vhdsm.cmx int_types.cmx int_rpc.cmx context.cmx
 int_types.cmo : context.cmo
 int_types.cmx : context.cmx
 iscsilib.cmo :
 iscsilib.cmx :
+junk.cmo : extentlist.cmo
+junk.cmx : extentlist.cmx
 leaf_coalesce.cmo : vhdutil.cmo vhd_types.cmo vhd_records.cmi nmutex.cmo \
     master_utils.cmo lvmabs.cmi locking.cmo int_types.cmo \
     int_client_utils.cmo int_client.cmo id_map.cmo global.cmo coalesce.cmi
@@ -122,10 +122,10 @@ tracelog.cmo : vhd_types.cmo vhd_records.cmi nmutex.cmo lvmabs_types.cmi \
     int_types.cmo context.cmo
 tracelog.cmx : vhd_types.cmx vhd_records.cmx nmutex.cmx lvmabs_types.cmx \
     int_types.cmx context.cmx
-transport.cmo : vhd_types.cmo olvm.cmi nfs.cmo iscsilib.cmo errors.cmo \
-    drivers.cmo
-transport.cmx : vhd_types.cmx olvm.cmx nfs.cmx iscsilib.cmx errors.cmx \
-    drivers.cmx
+transport.cmo : vhdd_helper.cmo vhd_types.cmo olvm.cmi nfs.cmo global.cmo \
+    errors.cmo drivers.cmo
+transport.cmx : vhdd_helper.cmx vhd_types.cmx olvm.cmx nfs.cmx global.cmx \
+    errors.cmx drivers.cmx
 vhdMaster.cmo : vhdutil.cmo vhdrpc.cmo vhd_types.cmo vhd_records.cmi \
     tracelog.cmo slave_sr_attachments.cmo scan.cmo rwlock.cmo olvm.cmi \
     nmutex.cmo master_utils.cmo lvmabs_types.cmi lvmabs.cmi locking.cmo \
@@ -158,16 +158,18 @@ vhdd.cmo : vhdsm.cmo vhdrpc.cmo tracelog.cmo tapdisk_listen.cmo tapdisk.cmo \
 vhdd.cmx : vhdsm.cmx vhdrpc.cmx tracelog.cmx tapdisk_listen.cmx tapdisk.cmx \
     int_server.cmx int_rpc.cmx html.cmx global.cmx fileserver.cmx \
     fd_pass_receiver.cmx drivers.cmx context.cmx attachments.cmx
+vhdd_helper.cmo :
+vhdd_helper.cmx :
 vhdrpc.cmo : global.cmo
 vhdrpc.cmx : global.cmx
-vhdsm.cmo : vhdrpc.cmo vhd_types.cmo vhdSlave.cmo vhdMaster.cmo \
-    transport.cmo slave_sr_attachments.cmo nmutex.cmo master_probe.cmo \
-    lvmabs.cmi int_types.cmo html.cmo host.cmi global.cmo drivers.cmo \
-    context.cmo attachments.cmi
-vhdsm.cmx : vhdrpc.cmx vhd_types.cmx vhdSlave.cmx vhdMaster.cmx \
-    transport.cmx slave_sr_attachments.cmx nmutex.cmx master_probe.cmx \
-    lvmabs.cmx int_types.cmx html.cmx host.cmx global.cmx drivers.cmx \
-    context.cmx attachments.cmx
+vhdsm.cmo : vhdutil.cmo vhdrpc.cmo vhd_types.cmo vhd_records.cmi \
+    vhdSlave.cmo vhdMaster.cmo transport.cmo slave_sr_attachments.cmo \
+    nmutex.cmo master_probe.cmo lvmabs.cmi int_types.cmo html.cmo host.cmi \
+    global.cmo drivers.cmo debug_utils.cmo context.cmo attachments.cmi
+vhdsm.cmx : vhdutil.cmx vhdrpc.cmx vhd_types.cmx vhd_records.cmx \
+    vhdSlave.cmx vhdMaster.cmx transport.cmx slave_sr_attachments.cmx \
+    nmutex.cmx master_probe.cmx lvmabs.cmx int_types.cmx html.cmx host.cmx \
+    global.cmx drivers.cmx debug_utils.cmx context.cmx attachments.cmx
 vhdutil.cmo : global.cmo
 vhdutil.cmx : global.cmx
 attachments.cmi : vhd_types.cmo int_types.cmo

@@ -40,7 +40,7 @@ let unregister (sr,id) =
     Hashtbl.remove h (sr,id))
 
 let oneshot () =
-  Hashtbl.iter (fun (sr,id) st ->
+  Hashtbl.iter (fun (sr,vdi) st ->
     let len = Int32.to_int (get_tapdisk_stats_len st.cs) in
     let crc = get_tapdisk_stats_checksum st.cs in
     let str = String.make len '\000' in
@@ -56,7 +56,7 @@ let oneshot () =
 	let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
 	let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
 	let with_footer = Int64.add end_of_chunk_including_bitmap 512L in
-	Int_client.Vdi.slave_set_phys_size (Int_rpc.wrap_rpc ((!Vhdrpc.local_rpc) (Uuidm.to_string (Uuidm.create Uuidm.(`V4))))) sr id with_footer;
+	Int_client.LocalClient.VDI.slave_set_phys_size ~sr ~vdi ~size:with_footer;
       end
     end) h
 

@@ -99,9 +99,10 @@ let reattach_and_stop_and_copy_on_host context metadata id leaf_uid leaf_info ho
 		else new_leaf_path
 	in
 
-	Int_client_utils.master_retry_loop context [] [] (fun rpc ->
-		Int_client.Vdi.slave_leaf_coalesce_stop_and_copy
-			rpc	host metadata.m_data.m_sr_uuid id leaf_path new_leaf_path) metadata ssa.ssa_host;
+	Int_client_utils.master_retry_loop context [] [] (fun client ->
+	  let module Client = (val client : Int_client.CLIENT) in
+	  Client.VDI.slave_leaf_coalesce_stop_and_copy
+	    ~sr:metadata.m_data.m_sr_uuid ~vdi:id ~leaf_path ~new_leaf_path) metadata ssa.ssa_host;
 	
 	parent_ptr
 

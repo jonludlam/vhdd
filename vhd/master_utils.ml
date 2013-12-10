@@ -167,9 +167,10 @@ let reattach_nolock context metadata id sai host =
 	try
 		let ssa = Nmutex.execute context metadata.m_attached_hosts_lock "Find the host's IP" 
 			(fun () -> List.find (fun ssa -> ssa.ssa_host.h_uuid = host) metadata.m_data.m_attached_hosts) in
-		Int_client_utils.master_retry_loop context [e_not_attached; e_sr_not_attached] [] (fun rpc ->
-			Int_client.Vdi.slave_reload rpc host metadata.m_data.m_sr_uuid [(id,sai)])
-			metadata ssa.ssa_host
+		Int_client_utils.master_retry_loop context [e_not_attached; e_sr_not_attached] [] (fun client ->
+		  let module Client = (val client : Int_client.CLIENT) in
+		  Client.VDI.slave_reload ~sr:metadata.m_data.m_sr_uuid ~vdis:[(id,sai)])
+		  metadata ssa.ssa_host
 	with Not_found ->
 		debug "Host not found - assuming it's been shut down"
 

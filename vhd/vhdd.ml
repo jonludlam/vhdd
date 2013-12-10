@@ -45,15 +45,15 @@ let internal_handler req fd () =
 	req.Http.Request.close <- true;
 	debug "Internal handler";
 	let body = read_body req fd in
-	let call = Int_rpc.intrpc_of_rpc (Jsonrpc.of_string body) in
+	let call = Jsonrpc.call_of_string body in
 	debug "Call=%s" body;
 	(* Extract some info from the XML before we pass it to process *)
 (*	let call,args = XMLRPC.From.methodCall xml in*)
 	let context = Context.({c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); c_other_info=[] }) in
 	Debug.associate_thread_with_task context.Context.c_task_id;
 	(*Tracelog.append context (Tracelog.InternalCall (body, call)) None;*)
-	let result = Int_server.process context call in
-	let str = Jsonrpc.to_string (Int_rpc.rpc_of_intrpc_response_wrapper result) in
+	let result = Int_server.S.process context call in
+	let str = Jsonrpc.string_of_response result in
 (*	Tracelog.append context (Tracelog.InternalResult str) None;*)
 	debug "Response: %s" str;
 	Http_svr.response_str req fd str

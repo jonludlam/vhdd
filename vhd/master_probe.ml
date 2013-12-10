@@ -14,12 +14,14 @@ exception NoMaster
 
 let test_master ctx m sr =
 	try
-		let remote_attach_mode = Int_client.SR.mode (Int_rpc.wrap_rpc (Vhdrpc.remote_rpc ctx.c_task_id (match m.h_ip with Some x -> x | None -> failwith "No IP") m.h_port)) sr in
-		begin
-			match remote_attach_mode with
-				| Master -> true
-				| _ -> false
-		end
+	  let client = Int_client.get m in
+	  let module Client = (val client : Int_client.CLIENT) in
+	  let remote_attach_mode = Client.SR.mode ~sr in
+	  begin
+	    match remote_attach_mode with
+	    | Master -> true
+	    | _ -> false
+	  end
 	with e -> 
 		warn "Caught exception while testing the master: %s" (Printexc.to_string e);
 		false

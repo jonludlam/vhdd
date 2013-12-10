@@ -151,8 +151,9 @@ module VDI = struct
 	    match current with
 	    | None ->
 	      let slave_attach_info = 
-		Int_client_utils.slave_retry_loop context [e_unknown_location] (fun rpc -> 
-		  Int_client.Vdi.slave_attach rpc host_uuid sr_uuid id writable false) metadata in
+		Int_client_utils.slave_retry_loop context [e_unknown_location] (fun client -> 
+		  let module Client = (val client : Int_client.CLIENT) in
+		  Client.VDI.slave_attach ~host_uuid ~sr:sr_uuid ~vdi:id ~writable ~is_reattach:false) metadata in
 	      debug "Got response: leaf=%s" slave_attach_info.sa_leaf_path;
 	      
 	      with_master_approved_op context metadata id Attaching (fun () -> 
@@ -163,8 +164,9 @@ module VDI = struct
 		  log_backtrace ();
 		  error "Caught exception while attaching: %s" (Printexc.to_string e);
 		  remove_slave_attach_info_from_disk sr_uuid id;
-		  Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-		    Int_client.Vdi.slave_detach rpc host_uuid sr_uuid id) metadata;
+		  Int_client_utils.slave_retry_loop context [] (fun client -> 
+		    let module Client = (val client : Int_client.CLIENT) in
+		    Client.VDI.slave_detach ~host_uuid ~sr:sr_uuid ~vdi:id) metadata;
 		  error "Issued slave_detach";
 		  raise e)
 	    | Some current ->
@@ -261,9 +263,10 @@ module VDI = struct
 				Nmutex.execute context metadata.s_mutex "Reactivating if necessary" (fun () -> 
 					let new_savi = Hashtbl.find metadata.s_data.s_attached_vdis id in
 					if new_savi.savi_activated then begin
-						Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-							
-							Int_client.Vdi.slave_activate rpc (Global.get_host_uuid ()) metadata.s_data.s_sr id true) metadata
+						Int_client_utils.slave_retry_loop context [] (fun client -> 
+						  let module Client = (val client : Int_client.CLIENT) in
+						  
+						  Client.VDI.slave_activate ~host_uuid:(Global.get_host_uuid ()) ~sr:metadata.s_data.s_sr ~vdi:id ~is_reactivate:true) metadata
 					end;
 				))
 
@@ -288,8 +291,9 @@ module VDI = struct
 
 			(* We can't be detached because of the 'with_op' fn above, so now we're safe *)
 			let sai = 
-				Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-					Int_client.Vdi.slave_attach rpc (Global.get_host_uuid ()) metadata.s_data.s_sr id writable true) metadata in
+				Int_client_utils.slave_retry_loop context [] (fun client -> 
+				  let module Client = (val client : Int_client.CLIENT) in
+				  Client.VDI.slave_attach ~host_uuid:(Global.get_host_uuid ()) ~sr:metadata.s_data.s_sr ~vdi:id ~writable ~is_reattach:true) metadata in
 			
 			debug "Got response: leaf=%s" sai.sa_leaf_path;
 			
@@ -327,10 +331,11 @@ module VDI = struct
 
 					begin
 						try
-							Int_client_utils.slave_retry_loop context [e_not_attached] (fun rpc -> 
+							Int_client_utils.slave_retry_loop context [e_not_attached] (fun client -> 
+							  let module Client = (val client : Int_client.CLIENT) in
 
-								Int_client.Vdi.slave_detach rpc
-								(Global.get_host_uuid ()) metadata.s_data.s_sr id) metadata
+							  Client.VDI.slave_detach ~host_uuid:(Global.get_host_uuid ()) 
+							    ~sr:metadata.s_data.s_sr ~vdi:id) metadata
 						with IntError(e,args) as exn ->
 							if e=e_not_attached
 							then debug "Ignoring not_attached exception from master"
@@ -391,10 +396,11 @@ module VDI = struct
 					let savi = Hashtbl.find metadata.s_data.s_attached_vdis id in
 					savi.savi_activated))
 			then begin
-				Int_client_utils.slave_retry_loop context [e_vdi_active_elsewhere] (fun rpc -> 
+				Int_client_utils.slave_retry_loop context [e_vdi_active_elsewhere] (fun client -> 
+				  let module Client = (val client : Int_client.CLIENT) in
 
-					Int_client.Vdi.slave_activate rpc
-						(Global.get_host_uuid ()) metadata.s_data.s_sr id false) metadata;
+				  Client.VDI.slave_activate 
+				    ~host_uuid:(Global.get_host_uuid ()) ~sr:metadata.s_data.s_sr ~vdi:id ~is_reactivate:false) metadata;
 				with_master_approved_op context metadata id Activating (fun () -> 
 					try
 						activate_unsafe context metadata id
@@ -402,9 +408,11 @@ module VDI = struct
 						log_backtrace ();
 						debug "Caught exception while activating: %s" (Printexc.to_string e);
 						(* Failed - deactivate on master *)
-						Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-
-							Int_client.Vdi.slave_deactivate rpc (Global.get_host_uuid ()) metadata.s_data.s_sr id) metadata;
+						Int_client_utils.slave_retry_loop context [] (fun client -> 
+						  let module Client = (val client : Int_client.CLIENT) in
+						  
+						  Client.VDI.slave_deactivate ~host_uuid:(Global.get_host_uuid ()) 
+						    ~sr:metadata.s_data.s_sr ~vdi:id) metadata;
 						raise e)
 			end)
 
@@ -438,9 +446,10 @@ module VDI = struct
 					end;
 					savi.savi_activated <- false);
 			try
-				Int_client_utils.slave_retry_loop context [e_not_activated] (fun rpc -> 
+				Int_client_utils.slave_retry_loop context [e_not_activated] (fun client -> 
+				  let module Client = (val client : Int_client.CLIENT) in
 
-					Int_client.Vdi.slave_deactivate rpc	(Global.get_host_uuid ()) metadata.s_data.s_sr id) metadata
+				  Client.VDI.slave_deactivate ~host_uuid:(Global.get_host_uuid ()) ~sr:metadata.s_data.s_sr ~vdi:id) metadata
 			with
 				| IntError(e,args) as exn ->
 					if (e=e_not_activated)
@@ -511,11 +520,11 @@ module VDI = struct
 		then
 			ignore(Thread.create (fun () ->
 			  debug "thin_provision_check call thread created";
-				Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-
-					Int_client.SR.thin_provision_check rpc metadata.s_data.s_sr) metadata ) ())
+				Int_client_utils.slave_retry_loop context [] (fun client -> 
+				  let module Client = (val client : Int_client.CLIENT) in
+				  Client.SR.thin_provision_check ~sr:metadata.s_data.s_sr) metadata ) ())
 		else
-		  debug "not bothing"
+		  debug "not bothering"
 
 
 	let generate_config context metadata device_config vdi =
@@ -523,9 +532,10 @@ module VDI = struct
 		fix_ctx context (Some id);
 		let sr_uuid = metadata.s_data.s_sr in
 		let slave_attach_info = 
-			Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-
-				Int_client.Vdi.get_slave_attach_info rpc sr_uuid id) metadata in
+		  Int_client_utils.slave_retry_loop context [] (fun client -> 
+		    let module Client = (val client : Int_client.CLIENT) in
+		    
+		    Client.VDI.get_slave_attach_info ~sr:sr_uuid ~vdi:id) metadata in
 		let arg = Jsonrpc.to_string (rpc_of_slave_attach_info slave_attach_info) in
 (*		let call = Smapi_client.make_call ~vdi_location:id device_config (Some metadata.s_data.s_sr) "vdi_attach_from_config" [ arg ] in
 		let str = Xml.to_string (Smapi_client.xmlrpc_of_call call) in
@@ -665,7 +675,6 @@ module SR = struct
 		{
 			s_mutex=Nmutex.create "s_mutex";
 			s_condition=Nmutex.create_condition "s_condition";
-			s_rpc=(fun context xml -> failwith "RPC not initialised");
 			s_idx=0;
 			s_data = {
 				s_path=path;
@@ -695,9 +704,10 @@ module SR = struct
 		in
 
 		Int_client_utils.slave_retry_loop context []
-			(fun rpc ->
-				ignore(Int_client.SR.slave_attach rpc "hello" metadata.s_data.s_sr (Global.get_localhost ())
-					attached_vdis_list)) metadata;
+			(fun client ->
+			  let module Client = (val client : Int_client.CLIENT) in
+			  ignore(Client.SR.slave_attach ~sr:metadata.s_data.s_sr ~host:(Global.get_localhost ())
+					~vdis:attached_vdis_list)) metadata;
 
 		debug "Registration functions finished. Setting s_ready=true";
 
@@ -771,9 +781,10 @@ module SR = struct
 										else acc) metadata.s_data.s_attached_vdis []) in
 						if List.length need_resizing > 0 then begin
 							let new_attach_infos = 
-								Int_client_utils.slave_retry_loop context [] (fun rpc -> 
-
-									Int_client.Vdi.thin_provision_request_more_space rpc metadata.s_data.s_sr (Global.get_host_uuid ()) need_resizing) metadata in
+								Int_client_utils.slave_retry_loop context [] (fun client -> 
+								  let module Client = (val client : Int_client.CLIENT) in
+								  
+								  Client.VDI.thin_provision_request_more_space ~sr:metadata.s_data.s_sr ~host_uuid:(Global.get_host_uuid ()) ~sizes:need_resizing) metadata in
 							debug "New attach infos: length=%d" (List.length new_attach_infos);
 							List.iter (function ai ->
 								Nmutex.execute context metadata.s_mutex "Changing VDI" (fun () ->

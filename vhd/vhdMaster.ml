@@ -429,160 +429,161 @@ end
 	   done as part of the post-slave-recover sync.
 	*)
 
-	let attach context device_config driver path sr =
-		fix_ctx context None;
+			     let attach context device_config driver path sr =
+			       fix_ctx context None;
 
-		let m_rolling_upgrade = List.mem_assoc "rolling_upgrade_mode" device_config in
-		debug "m_rolling_upgrade=%b" m_rolling_upgrade;
+			       let m_rolling_upgrade = List.mem_assoc "rolling_upgrade_mode" device_config in
+			       debug "m_rolling_upgrade=%b" m_rolling_upgrade;
 
-		let check container =
-			let container_sr_uuid = Lvmabs.container_sr_uuid context container in
-			if container_sr_uuid <> sr then begin
-				debug "container_sr_uuid=%s expecting:%s" container_sr_uuid sr;
-				failwith "Could't find VG"
-			end
-		in
+			       let check container =
+				 let container_sr_uuid = Lvmabs.container_sr_uuid context container in
+				 if container_sr_uuid <> sr then begin
+				   debug "container_sr_uuid=%s expecting:%s" container_sr_uuid sr;
+				   failwith "Could't find VG"
+				 end
+			       in
 
-		let (container,vhds,raw_lvs) =
-			let container =
-				match driver with
-					| Lvm _ ->
-						let device = path in
-						Lvmabs.init_lvm context (String.split ',' device)
-					| OldLvm _ ->
-						let device = path in
-						Lvmabs.init_origlvm context sr (String.split ',' device)
-					| File _ ->
-						let path = path in
-						Lvmabs.init_fs context path
-			in
-			debug "container initialised";
-			check container;
-			let vhds = Scan.scan context container in
-			let raw_lvs =
-				let hidden_lvs = Lvmabs.get_hidden_lvs context container in
-				Lvmabs.scan context container (fun loc_info ->
-					if loc_info.Lvmabs_types.location_type=Lvmabs_types.Raw 
-					then Some (PRaw (loc_info),List.mem loc_info hidden_lvs)
-					else None)
-			in
-			(container,vhds,raw_lvs)
-		in
- 
-		let (container,host_attachments_persistent_store) =
-			match Lvmabs.find_metadata context container "host_attachments" with
-				| Some x -> x
-				| None -> 
-					try 
-						Lvmabs.create_metadata context container "host_attachments" true
-					with e -> 
-						error "Caught error while trying to create host_attachments metadata: %s" (Printexc.to_string e);
-						failwith "Error attaching"
-		in
+			       let (container,vhds,raw_lvs) =
+				 let container =
+				   match driver with
+				   | Lvm _ ->
+				     let device = path in
+				     Lvmabs.init_lvm context (String.split ',' device)
+				   | OldLvm _ ->
+				     let device = path in
+				     Lvmabs.init_origlvm context sr (String.split ',' device)
+				   | File _ ->
+				     let path = path in
+				     Lvmabs.init_fs context path
+				 in
+				 debug "container initialised";
+				 check container;
+				 let vhds = Scan.scan context container in
+				 let raw_lvs =
+				   let hidden_lvs = Lvmabs.get_hidden_lvs context container in
+				   Lvmabs.scan context container (fun loc_info ->
+				     if loc_info.Lvmabs_types.location_type=Lvmabs_types.Raw 
+				     then Some (PRaw (loc_info),List.mem loc_info hidden_lvs)
+				     else None)
+				 in
+				 (container,vhds,raw_lvs)
+			       in
+			       
+			       let (container,host_attachments_persistent_store) =
+				 match Lvmabs.find_metadata context container "host_attachments" with
+				 | Some x -> x
+				 | None -> 
+				   try 
+				     Lvmabs.create_metadata context container "host_attachments" true
+				   with e -> 
+				     error "Caught error while trying to create host_attachments metadata: %s" (Printexc.to_string e);
+				     failwith "Error attaching"
+			       in
 
 		(* No other masters check *)
 
-		begin
-			let attachments_info =
-				Slave_sr_attachments.read_slave_sr_attachment_info_from_disk context container host_attachments_persistent_store
-			in
-			match attachments_info.master with
-				| Some h ->
-					if h.h_uuid <> Global.get_host_uuid () then begin
+			       begin
+				 let attachments_info =
+				   Slave_sr_attachments.read_slave_sr_attachment_info_from_disk context container host_attachments_persistent_store
+				 in
+				 match attachments_info.master with
+				 | Some h ->
+				   if h.h_uuid <> Global.get_host_uuid () then begin
 						(* If we're forcibly taking over mastership from someone else, we need to make
 						   sure it's not still the master *)
-						debug "Found that the SR believes another host is the master. Attempting to query";
-						let rpc = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc context.Context.c_task_id (match h.h_ip with Some x -> x | None -> "unknown")  h.h_port) in
-						let ok =
-							try
-								let old_master_mode = Int_client.SR.mode rpc sr in
-								debug "old_master_mode = %s" (Jsonrpc.to_string (rpc_of_attach_mode old_master_mode));
-								old_master_mode <> Master
-							with e ->
-								debug "Caught exception while trying to contact old master: %s" (Printexc.to_string e);
-								debug "Assuming that it's no longer the master then!";
-								true
-						in
-						if not ok then
-							raise (Other_master_detected h)
-					end
-				| None -> ()
-		end;
+				     debug "Found that the SR believes another host is the master. Attempting to query";
+				     let module Client = (val (Int_client.get h) : Int_client.CLIENT) in
 
-		let container,id_persistent_store_option,do_init = 
-			match Lvmabs.find_metadata context container "id_to_leaf_mapping" with
-				| Some (container,location) -> (container,Some location,false)
-				| None -> 
-					try 
-						let (container,location) = Lvmabs.create_metadata context container "id_to_leaf_mapping" false in
-						(container,Some location,true)
-					with _ ->
-						(container,None,true)
-		in
-		let id_map = Id_map.initialise_id_map context container id_persistent_store_option vhds do_init in
+				     let ok =
+				       try
+					 let old_master_mode = Client.SR.mode ~sr in
+					 debug "old_master_mode = %s" (Jsonrpc.to_string (rpc_of_attach_mode old_master_mode));
+					 old_master_mode <> Master
+				       with e ->
+					 debug "Caught exception while trying to contact old master: %s" (Printexc.to_string e);
+					 debug "Assuming that it's no longer the master then!";
+					 true
+				     in
+				     if not ok then
+				       raise (Other_master_detected h)
+				   end
+				 | None -> ()
+			       end;
 
-		let reservation_mode =
-			match driver with
-				| File _ -> None
-				| _ ->
-					try
-						match List.assoc "reservation_mode" device_config with
-							| "thin" -> Some Vhdutil.Thin
-							| "leaf" -> Some Vhdutil.Leaf
-							| "attach" -> Some Vhdutil.Attach
-							| _ -> Some Vhdutil.Leaf
-					with _ -> Some Vhdutil.Leaf
-		in
+			       let container,id_persistent_store_option,do_init = 
+				 match Lvmabs.find_metadata context container "id_to_leaf_mapping" with
+				 | Some (container,location) -> (container,Some location,false)
+				 | None -> 
+				   try 
+				     let (container,location) = Lvmabs.create_metadata context container "id_to_leaf_mapping" false in
+				     (container,Some location,true)
+				   with _ ->
+				     (container,None,true)
+			       in
+			       let id_map = Id_map.initialise_id_map context container id_persistent_store_option vhds do_init in
 
-		debug "Selected provisioning policy: %s"
-			(match reservation_mode with
-				| None -> "None"
-				| Some Vhdutil.Leaf -> "Leaf"
-				| Some Vhdutil.Thin -> "Thin"
-				| Some Vhdutil.Attach -> "Attach" );
+			       let reservation_mode =
+				 match driver with
+				 | File _ -> None
+				 | _ ->
+				   try
+				     match List.assoc "reservation_mode" device_config with
+				     | "thin" -> Some Vhdutil.Thin
+				     | "leaf" -> Some Vhdutil.Leaf
+				     | "attach" -> Some Vhdutil.Attach
+				     | _ -> Some Vhdutil.Leaf
+				   with _ -> Some Vhdutil.Leaf
+			       in
+
+			       debug "Selected provisioning policy: %s"
+				 (match reservation_mode with
+				 | None -> "None"
+				 | Some Vhdutil.Leaf -> "Leaf"
+				 | Some Vhdutil.Thin -> "Thin"
+				 | Some Vhdutil.Attach -> "Attach" );
 
 		(* Sanity check *)
-		begin
-			if m_rolling_upgrade then
-				match reservation_mode with
-					| None -> ()
-					| Some Vhdutil.Leaf -> ()
-					| _ -> failwith "Only leaf provisioning mode supported during rolling upgrade";
-		end;
+			       begin
+				 if m_rolling_upgrade then
+				   match reservation_mode with
+				   | None -> ()
+				   | Some Vhdutil.Leaf -> ()
+				   | _ -> failwith "Only leaf provisioning mode supported during rolling upgrade";
+			       end;
 
-		let m_vhds = Vhd_records.of_vhds vhds raw_lvs in
+			       let m_vhds = Vhd_records.of_vhds vhds raw_lvs in
 
-		let attached_hosts = Slave_sr_attachments.read_attached_hosts_from_disk context container host_attachments_persistent_store in
-		Tracelog.append context (Tracelog.Master_m_vhd_container container) (Some "Initial value");
-		Tracelog.append context (Tracelog.Master_m_id_to_leaf_mapping (Hashtbl.copy id_map)) (Some "Initial value");
-		Tracelog.append context (Tracelog.Master_m_vhds m_vhds) (Some "Initial value");
-		Tracelog.append context (Tracelog.Master_m_attached_hosts attached_hosts) (Some "Initial value");
-		Tracelog.append context (Tracelog.Master_m_coalesce_in_progress false) (Some "Initial value");
-		Tracelog.append context (Tracelog.Master_m_rolling_upgrade m_rolling_upgrade) (Some "Initial value");
-		{ 
-			m_data = 
-				{ 
-					m_vhd_container=container;
-					m_id_mapping_persistent_store=container,id_persistent_store_option;
-					m_id_to_leaf_mapping=id_map;
-					m_vhds=m_vhds;
-					m_attached_hosts_persistent_store=(container,host_attachments_persistent_store);
-					m_attached_hosts=attached_hosts;
-					m_coalesce_in_progress=false;
-					m_lvm_reservation_mode=reservation_mode;
-					m_rolling_upgrade=m_rolling_upgrade;
-					m_attach_finished=false;
-					m_sr_uuid=sr };
-			m_idx=0;
-			m_container_lock=Rwlock.create ();
-			m_id_mapping_lock=Nmutex.create "m_id_mapping_lock";
-			m_id_mapping_condition=Nmutex.create_condition "m_id_mapping_condition";
-			m_vhd_hashtbl_lock=Nmutex.create "m_vhd_hashtbl_lock";
-			m_attached_hosts_lock = Nmutex.create "m_attached_hosts_lock";
-			m_attached_hosts_condition = Nmutex.create_condition "m_attached_hosts_condition";
-			m_coalesce_in_progress_lock=Nmutex.create "m_coalesce_in_progress_lock";
-			m_coalesce_condition=Nmutex.create_condition "m_coalesce_condition";
-		}
+			       let attached_hosts = Slave_sr_attachments.read_attached_hosts_from_disk context container host_attachments_persistent_store in
+			       Tracelog.append context (Tracelog.Master_m_vhd_container container) (Some "Initial value");
+			       Tracelog.append context (Tracelog.Master_m_id_to_leaf_mapping (Hashtbl.copy id_map)) (Some "Initial value");
+			       Tracelog.append context (Tracelog.Master_m_vhds m_vhds) (Some "Initial value");
+			       Tracelog.append context (Tracelog.Master_m_attached_hosts attached_hosts) (Some "Initial value");
+			       Tracelog.append context (Tracelog.Master_m_coalesce_in_progress false) (Some "Initial value");
+			       Tracelog.append context (Tracelog.Master_m_rolling_upgrade m_rolling_upgrade) (Some "Initial value");
+			       { 
+				 m_data = 
+				   { 
+				     m_vhd_container=container;
+				     m_id_mapping_persistent_store=container,id_persistent_store_option;
+				     m_id_to_leaf_mapping=id_map;
+				     m_vhds=m_vhds;
+				     m_attached_hosts_persistent_store=(container,host_attachments_persistent_store);
+				     m_attached_hosts=attached_hosts;
+				     m_coalesce_in_progress=false;
+				     m_lvm_reservation_mode=reservation_mode;
+				     m_rolling_upgrade=m_rolling_upgrade;
+				     m_attach_finished=false;
+				     m_sr_uuid=sr };
+				 m_idx=0;
+				 m_container_lock=Rwlock.create ();
+				 m_id_mapping_lock=Nmutex.create "m_id_mapping_lock";
+				 m_id_mapping_condition=Nmutex.create_condition "m_id_mapping_condition";
+				 m_vhd_hashtbl_lock=Nmutex.create "m_vhd_hashtbl_lock";
+				 m_attached_hosts_lock = Nmutex.create "m_attached_hosts_lock";
+				 m_attached_hosts_condition = Nmutex.create_condition "m_attached_hosts_condition";
+				 m_coalesce_in_progress_lock=Nmutex.create "m_coalesce_in_progress_lock";
+				 m_coalesce_condition=Nmutex.create_condition "m_coalesce_condition";
+			       }
 
 	let attach_part_two context metadata =
 		fix_ctx context None;
@@ -633,17 +634,18 @@ end
 		debug "About to iterate over attached slaves";
 
 		List.iter (fun ssa ->
-			ignore(Thread.create (fun rpc ->
+			ignore(Thread.create (fun () ->
 				debug "Recovering slave %s" ssa.ssa_host.h_uuid;
-				Int_client_utils.master_retry_loop context [e_sr_not_attached] [] (fun rpc ->
-					debug "Issuing slave recover";
-					Int_client.SR.slave_recover rpc "foo" metadata.m_data.m_sr_uuid localhost;
-					debug "Done";
-					Nmutex.execute context metadata.m_attached_hosts_lock "Setting resync_required state" (fun () ->
-						ssa.ssa_resync_required <- false;
-						Nmutex.condition_broadcast context metadata.m_attached_hosts_condition);
+				Int_client_utils.master_retry_loop context [e_sr_not_attached] [] (fun client ->
+				  let module Client = (val client : Int_client.CLIENT) in
+				  debug "Issuing slave recover";
+				  Client.SR.slave_recover ~sr:metadata.m_data.m_sr_uuid ~master:localhost;
+				  debug "Done";
+				  Nmutex.execute context metadata.m_attached_hosts_lock "Setting resync_required state" (fun () ->
+				    ssa.ssa_resync_required <- false;
+				    Nmutex.condition_broadcast context metadata.m_attached_hosts_condition);
 				) metadata ssa.ssa_host) ())) need_resync
-
+		  
 	let assert_can_detach context metadata device_config =
 		if metadata.m_data.m_attach_finished <> true then 
 			failwith "Can't detach when not finished attaching"
