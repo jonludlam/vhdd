@@ -21,9 +21,6 @@ let meg = Int64.mul 1024L 1024L
 let stddisksize = Int64.mul 50L meg
 let smallerdisksize = Int64.mul 40L meg
 
-
-let intrpc host port = Int_rpc.wrap_rpc (Vhdrpc.remote_rpc "dummy" host port)
-
 let dummy_context = {
 	Context.c_driver = "none";
 	c_api_call = "none";
@@ -40,7 +37,7 @@ type vhdd = {
 	pidfile : string;
 	host_id : string;
 	client : (module CLIENT);
-	intrpc : Int_rpc.intrpc -> Int_rpc.intrpc_response_wrapper;
+	intclient : (module Int_client.CLIENT);
 }
 
 type state = {
@@ -100,7 +97,8 @@ module Dummy = struct
 		let myrpc call = Xcp_client.xml_http_rpc ~srcstr:"ftests" ~dststr:"storage" 
 		  (fun () -> Printf.sprintf "http://127.0.0.1:%d/lvmnew" port) call 
 		in
-		let myintrpc = intrpc "127.0.0.1" port in
+		let myintclient = Int_client.get {h_uuid="null"; h_ip=Some "127.0.0.1"; h_port=port} in
+		let module Intclient = (val myintclient : Int_client.CLIENT) in
 		let client = (module (Storage_interface.Client(struct let rpc call = myrpc call end)) : CLIENT) in
 		let rec wait_for_start total =
 			try
@@ -111,8 +109,8 @@ module Dummy = struct
 				  Printf.printf "stderr:\n%s\n\nstdout:\n%s\n\n" stderr log;
 				  exit 1
 				    
-				end
-				ignore(Int_client.Debug.get_pid myintrpc);
+				end;
+				let pid = Intclient.Debug.get_pid () in
 				let module Client = (val client : CLIENT) in
 				debug "Got here...";
 				ignore(Client.SR.list ~dbg:"wait_for_start");
@@ -130,11 +128,12 @@ module Dummy = struct
 		  pidfile = pidfile;
 		  host_id = host_id;
 		  client = client;
-		  intrpc = myintrpc; }
+		  intclient = myintclient; }
 
 	let kill_vhdd vhdd =
 	        debug "Killing vhdd";
-	  (try Int_client.Debug.die vhdd.intrpc false with e -> debug "Caught exception %s" (Printexc.to_string e));
+	  let module Intclient = (val vhdd.intclient : Int_client.CLIENT) in
+	  (try Intclient.Debug.die ~restart:false with e -> debug "Caught exception %s" (Printexc.to_string e));
 		(*match vhdd.pid with Some h -> ignore(Forkhelpers.waitpid h) | None -> *)
 		  Thread.delay 0.5
 
@@ -212,11 +211,13 @@ module Real = struct
 	let init () =
 		let make_vhdd host =
 		  let myrpc call = Xcp_client.xml_http_rpc ~srcstr:"ftests" ~dststr:"storage" 
-		    (fun () -> Printf.sprintf "http://localhost:4094/%s" !uri) call 
+		    (fun () -> Printf.sprintf "http://%s:4094/%s" host !uri) call 
 		  in
-		  let myintrpc = intrpc "localhost" 4094 in
+		  let myhost = { h_uuid="unknown"; h_ip=Some host; h_port=4094; } in
 		  let client = (module (Storage_interface.Client(struct let rpc call = myrpc call end)) : CLIENT) in
-		  let host_id = Int_client.Debug.get_host myintrpc in
+		  let intclient = Int_client.get myhost in
+		  let module Intclient = (val intclient : Int_client.CLIENT) in
+		  let host_id = Intclient.Debug.get_host () in
 		  {
 		    pid = None;
 		    host_id;
@@ -224,7 +225,7 @@ module Real = struct
 		    logfile = "";
 		    errfile = "";
 		    client;
-		    intrpc = myintrpc }
+		    intclient }
 		in
 		let vhdds = List.map make_vhdd !hosts in
 		let sr = "1" in
@@ -269,8 +270,9 @@ let cleanup = ref Dummy.cleanup
 
 let get_chain_length state id = 
 	let master = List.hd state.vhdds in
-	let id_map = Int_client.Debug.get_id_to_leaf_map master.intrpc state.sr in
-	let vhds = Int_client.Debug.get_vhds master.intrpc state.sr in
+	let module Intclient = (val master.intclient : Int_client.CLIENT) in
+	let id_map = Intclient.Debug.get_id_to_leaf_map ~sr:state.sr in
+	let vhds = Intclient.Debug.get_vhds ~sr:state.sr in
 	let leaf_info = Hashtbl.find id_map id in
 	match leaf_info.leaf with
 		| PVhd vhduid -> 
@@ -284,10 +286,11 @@ let get_chain_length state id =
 (* Check that what the master thinks is the state of the world is the the same as all of the slaves *)
 let check_consistency state =
 	let master = List.hd state.vhdds in
-	let id_map = Int_client.Debug.get_id_to_leaf_map master.intrpc state.sr in
-	let vhds = Int_client.Debug.get_vhds master.intrpc state.sr in
+	let module Intclient = (val master.intclient : Int_client.CLIENT) in
+	let id_map = Intclient.Debug.get_id_to_leaf_map ~sr:state.sr in
+	let vhds = Intclient.Debug.get_vhds ~sr:state.sr in
 	let vhds = Vhd_records.get_vhd_hashtbl_copy dummy_context vhds in
-	let container = Int_client.Debug.get_vhd_container master.intrpc state.sr in
+	let container = Intclient.Debug.get_vhd_container ~sr:state.sr in
 
 	let ctx = {Context.c_driver=""; c_api_call=""; c_task_id=""; c_other_info=[]} in
 	let dm_info = Lvmabs.scan ctx container (Lvmabs.get_attach_info ctx container) in
@@ -302,8 +305,9 @@ let check_consistency state =
 					| Some (AttachedRW x) -> if List.mem slave.host_id x then k::acc else acc
 					| None -> acc) id_map []
 		in
-
-		let attached_vdis = Int_client.Debug.get_attached_vdis slave.intrpc state.sr in
+		
+		let module Slaveclient = (val slave.intclient : Int_client.CLIENT) in
+		let attached_vdis = Slaveclient.Debug.get_attached_vdis ~sr:state.sr in
 
 		(* Check that the slave does have the VDIs attached that the master thinks it does *)
 		List.iter (fun k ->
@@ -348,7 +352,7 @@ let check_consistency state =
 							  | _ -> failwith "Ack"
 					  end
 			end else begin
-				let vhduid = Int_client.Debug.slave_get_leaf_vhduid slave.intrpc state.sr k in
+				let vhduid = Slaveclient.Debug.slave_get_leaf_vhduid ~sr:state.sr ~vdi:k in
 				match leaf_info.leaf with
 					| PVhd x -> if x <> vhduid then begin
 						  consistent := false;
@@ -437,16 +441,18 @@ let resize_vdi_online state vdi newsize = resize_vdi state vdi newsize
 
 let write_junk state host_id vdi size n current =
 	let vhdd = List.find (fun vhdd -> vhdd.host_id = host_id) state.vhdds in
-	Int_client.Debug.write_junk vhdd.intrpc state.sr vdi size n current
+	let module Intclient = (val vhdd.intclient : Int_client.CLIENT) in
+	Intclient.Debug.write_junk ~sr:state.sr ~vdi ~size ~n ~current
 
 (* Check junk checks twice - once with the wrong junk, and once with the correct junk *)
 let check_junk state host_id vdi junk =
 	let vhdd = List.find (fun vhdd -> vhdd.host_id = host_id) state.vhdds in
+	let module Intclient = (val vhdd.intclient : Int_client.CLIENT) in
 	let success1 =
-		try Int_client.Debug.check_junk vhdd.intrpc state.sr vdi (([(0L,10L)],char_of_int 55)::junk); false with e -> true
+		try Intclient.Debug.check_junk ~sr:state.sr ~vdi ~current:(([(0L,10L)],char_of_int 55)::junk); false with e -> true
 	in
 	let success2 =
-		try Int_client.Debug.check_junk vhdd.intrpc state.sr vdi junk; true with e -> false
+		try Intclient.Debug.check_junk ~sr:state.sr ~vdi ~current:junk; true with e -> false
 	in
 
 	if (not (success1 && success2)) && !real then begin
@@ -456,23 +462,25 @@ let check_junk state host_id vdi junk =
 
 let restart_master state =
 	let master = List.hd state.vhdds in
-	let oldpid = Int_client.Debug.get_pid master.intrpc in
-	(try Int_client.Debug.die master.intrpc true with _ -> ());
+	let module Intclient = (val master.intclient : Int_client.CLIENT) in
+	let oldpid = Intclient.Debug.get_pid () in
+	(try Intclient.Debug.die ~restart:true with _ -> ());
 	let rec wait_for_new_pid () =
 		try
 			Thread.delay 0.1;
-			let newpid = Int_client.Debug.get_pid master.intrpc in
+			let newpid = Intclient.Debug.get_pid () in
 			if newpid = oldpid then wait_for_new_pid ()
 		with _ ->
 			wait_for_new_pid ()
 	in wait_for_new_pid ();
 
 	let rec wait_for_ready () =
-		try
-			Thread.delay 0.1;
-			Int_client.Debug.get_ready master.intrpc
-		with _ ->
-			wait_for_ready ()
+	  Thread.delay 0.1;
+	  try 
+	    if not (Intclient.Debug.get_ready ())
+	    then wait_for_ready ()
+	    else ()
+	  with _ -> wait_for_ready ()
 	in
 
 	wait_for_ready ();
@@ -480,7 +488,7 @@ let restart_master state =
 	let rec wait_for_attach_finished () =
 		try
 			Thread.delay 0.1;
-			let attach_finished = Int_client.Debug.get_attach_finished master.intrpc state.sr in
+			let attach_finished = Intclient.Debug.get_attach_finished ~sr:state.sr in
 			if not attach_finished then wait_for_attach_finished ()
 		with _ -> wait_for_attach_finished ()
 	in
@@ -490,16 +498,18 @@ let restart_master state =
 
 let master_set_wait_mode state wait =
 	let master = List.hd state.vhdds in
-	Int_client.Debug.waiting_mode_set master.intrpc wait
+	let module Intclient = (val master.intclient : Int_client.CLIENT) in
+	Intclient.Debug.waiting_mode_set ~mode:wait
 
 let master_step state =
 	let master = List.hd state.vhdds in
+	let module Intclient = (val master.intclient : Int_client.CLIENT) in
 	D.debug "Getting waiting locks";
-	let locks = Int_client.Debug.waiting_locks_get master.intrpc in
+	let locks = Intclient.Debug.waiting_locks_get () in
 	if List.length locks > 0 then begin
 		let (lock,_) = List.hd locks in
 		D.debug "Unwaiting lock";
-		Int_client.Debug.waiting_lock_unwait master.intrpc lock;
+		Intclient.Debug.waiting_lock_unwait ~lock;
 		true
 	end else (D.debug "No waiting locks"; Thread.delay 0.1; false)
 
@@ -730,10 +740,11 @@ end
 module Killed_operations = struct
 	let get_keys state =
 		let master = List.hd state.vhdds in
-		let id_map = Int_client.Debug.get_id_to_leaf_map master.intrpc state.sr in
-		let vhds = Int_client.Debug.get_vhds master.intrpc state.sr in
+		let module Intclient = (val master.intclient : Int_client.CLIENT) in
+		let id_map = Intclient.Debug.get_id_to_leaf_map ~sr:state.sr in
+		let vhds = Intclient.Debug.get_vhds ~sr:state.sr in
 		let vhds = Vhd_records.get_vhd_hashtbl_copy dummy_context vhds in
-		let container = Int_client.Debug.get_vhd_container master.intrpc state.sr in
+		let container = Intclient.Debug.get_vhd_container ~sr:state.sr in
 		let ids = Hashtbl.fold (fun k v acc -> k::acc) id_map [] in
 		let vhds = Hashtbl.fold (fun k v acc -> k::acc) vhds [] in
 		let lvs = match container with
@@ -875,7 +886,7 @@ module Killed_operations = struct
 	let get_op_n state master setup clean f name =
 		let result = setup state in
 		master_set_wait_mode state true;
-		let opn = Lockingtest.measure_call master.intrpc (f result) ignore name in
+		let opn = Lockingtest.measure_call master.intclient (f result) ignore name in
 		master_set_wait_mode state false;
 		clean result;
 		opn
@@ -896,6 +907,7 @@ module Killed_operations = struct
 		ignore(SC.SR.scan ~dbg ~sr:state.sr);
 		let keys1 = get_keys state in
 		let result = setup state in
+		let module Intclient = (val master.intclient : Int_client.CLIENT) in
 		Pervasiveext.finally (fun () ->
 			master_set_wait_mode state true;
 			let finished = ref false in
@@ -904,13 +916,13 @@ module Killed_operations = struct
 				let rec get_lock time =
 					if time>600.0 then failwith "Waited too long";
 					if !finished then failwith "Unexpectedly finished!";
-					let locks = Int_client.Debug.waiting_locks_get master.intrpc in
+					let locks = Intclient.Debug.waiting_locks_get () in
 					if List.length locks = 0
 					then (Thread.delay 0.1; get_lock (time +. 0.1))
 					else (List.hd locks)
 				in
 				let lock = get_lock 0.0 in
-				Int_client.Debug.waiting_lock_unwait master.intrpc (fst lock);
+				Intclient.Debug.waiting_lock_unwait (fst lock);
 				if i=n then begin
 					get_lock 0.0; (* Wait for the op to complete *)
 					print_endline (Printf.sprintf "Killing after op %d (%s: %s)" n
@@ -1705,6 +1717,7 @@ end
 
 let _ =
 	Global.unsafe_mode := true;
+	Global.host_uuid := Some "ftests";
 
 	let target = ref "lork.uk.xensource.com" in
 	let targetiqn = ref "iqn.2006-01.com.openfiler:jludlam1" in
