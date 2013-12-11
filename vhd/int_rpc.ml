@@ -3,6 +3,8 @@ open Int_types
 type vdi = Storage_interface.vdi
 type sr = Storage_interface.sr
 
+exception IntError of (string * (string list))
+
 type lock = string
 
 module SR = struct

@@ -62,7 +62,7 @@ module Dummy = struct
 		let pidfile = Printf.sprintf "/tmp/vhdd.pid.%d.%s" !counter host_id in
 		let logfile = Printf.sprintf "/tmp/vhdd.log.%d.%s" !counter host_id in
 		let errfile = Printf.sprintf "/tmp/vhdd.err.%d.%s" !counter host_id in
-		
+		let start = Unix.gettimeofday () in
 		let args = [
 			"-dummy";
 			"-dummydir"; "/tmp/dummytest";
@@ -90,19 +90,27 @@ module Dummy = struct
 		  failwith (Printf.sprintf "Signaled: %d" x)
 		| Unix.WSTOPPED x ->
 		  failwith (Printf.sprintf "Stopped: %d" x));
-		Thread.delay 0.5;
-		let ic = open_in pidfile in
-		let pid_str = input_line ic in
-		let pid = int_of_string pid_str in
+		let pid = 
+		  let rec inner () =
+		    if Unix.gettimeofday () -. start > 10.0 then failwith "Failed to get pid";
+		    try
+		      let ic = open_in pidfile in
+		      let pid_str = input_line ic in
+		      int_of_string pid_str
+		    with _ ->
+		      inner ()
+		  in inner ()
+		in
 		let myrpc call = Xcp_client.xml_http_rpc ~srcstr:"ftests" ~dststr:"storage" 
 		  (fun () -> Printf.sprintf "http://127.0.0.1:%d/lvmnew" port) call 
 		in
 		let myintclient = Int_client.get {h_uuid="null"; h_ip=Some "127.0.0.1"; h_port=port} in
 		let module Intclient = (val myintclient : Int_client.CLIENT) in
 		let client = (module (Storage_interface.Client(struct let rpc call = myrpc call end)) : CLIENT) in
-		let rec wait_for_start total =
+		let rec wait_for_start () =
 			try
-				if total > 100 then begin
+			  let now = Unix.gettimeofday () in
+				if now -. start > 10.0 then begin
 				  debug "Error waiting for vhdd to start";
 				  let log = Unixext.string_of_file logfile in
 				  let stderr = Unixext.string_of_file errfile in
@@ -115,12 +123,9 @@ module Dummy = struct
 				debug "Got here...";
 				ignore(Client.SR.list ~dbg:"wait_for_start");
 			with e ->
-			        debug "Caught exception: %s" (Printexc.to_string e);
-			        debug "Backtrace: %s" (Printexc.get_backtrace ());
-				Thread.delay 0.1;
-				wait_for_start (total+1)
+				wait_for_start ()
 		in
-		wait_for_start 0;
+		wait_for_start ();
 
 		{ pid = Some pid;
 		  errfile = errfile;
@@ -131,11 +136,23 @@ module Dummy = struct
 		  intclient = myintclient; }
 
 	let kill_vhdd vhdd =
-	        debug "Killing vhdd";
+	  debug "Killing vhdd";
+	  let rec wait n pid =
+	    try
+	      Unix.kill pid 0;
+	      wait (n+1) pid;
+	    with
+	    | Unix.Unix_error (Unix.ESRCH,_,_) ->
+	      debug "Finished after %d" n;
+	      ()
+	    | e ->
+	      raise e
+	  in
 	  let module Intclient = (val vhdd.intclient : Int_client.CLIENT) in
 	  (try Intclient.Debug.die ~restart:false with e -> debug "Caught exception %s" (Printexc.to_string e));
-		(*match vhdd.pid with Some h -> ignore(Forkhelpers.waitpid h) | None -> *)
-		  Thread.delay 0.5
+	  match vhdd.pid with
+	  | Some h -> wait 0 h
+	  | None -> Thread.delay 0.5
 
 	let create_and_attach vhdds =
 		let master = List.hd vhdds in
@@ -237,7 +254,7 @@ module Real = struct
 		Client.SR.create ~dbg ~sr ~device_config:master_device_config ~physical_size:0L;
 		Client.SR.attach ~dbg ~sr ~device_config:master_device_config;
 
-		Thread.delay 0.5;
+(*		Thread.delay 0.5;*)
 
 		List.iter (fun slave ->
 		  let module SC = (val slave.client : CLIENT) in
@@ -467,7 +484,7 @@ let restart_master state =
 	(try Intclient.Debug.die ~restart:true with _ -> ());
 	let rec wait_for_new_pid () =
 		try
-			Thread.delay 0.1;
+(*			Thread.delay 0.1;*)
 			let newpid = Intclient.Debug.get_pid () in
 			if newpid = oldpid then wait_for_new_pid ()
 		with _ ->
@@ -475,7 +492,7 @@ let restart_master state =
 	in wait_for_new_pid ();
 
 	let rec wait_for_ready () =
-	  Thread.delay 0.1;
+(*	  Thread.delay 0.1;*)
 	  try 
 	    if not (Intclient.Debug.get_ready ())
 	    then wait_for_ready ()
@@ -487,7 +504,7 @@ let restart_master state =
 
 	let rec wait_for_attach_finished () =
 		try
-			Thread.delay 0.1;
+(*			Thread.delay 0.1;*)
 			let attach_finished = Intclient.Debug.get_attach_finished ~sr:state.sr in
 			if not attach_finished then wait_for_attach_finished ()
 		with _ -> wait_for_attach_finished ()
@@ -1779,7 +1796,7 @@ let _ =
 				
 	(Real.uri := Printf.sprintf "/%s" !backend);
 
-	Debug.log_to_stdout ();
+(*	Debug.log_to_stdout ();*)
 
 	Real.hosts := String.split ',' !hosts;
 

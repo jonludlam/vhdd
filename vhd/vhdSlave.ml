@@ -151,9 +151,17 @@ module VDI = struct
 	    match current with
 	    | None ->
 	      let slave_attach_info = 
-		Int_client_utils.slave_retry_loop context [e_unknown_location] (fun client -> 
+		let x = Int_client_utils.slave_retry_loop context [e_unknown_location] (fun client -> 
 		  let module Client = (val client : Int_client.CLIENT) in
 		  Client.VDI.slave_attach ~host_uuid ~sr:sr_uuid ~vdi:id ~writable ~is_reattach:false) metadata in
+		if !Global.dummy 
+		then 
+		  { x with 
+		    sa_leaf_path = 
+		      Printf.sprintf "%s/%s" (Global.get_host_local_dummydir ()) x.sa_leaf_path
+		  }
+		else x
+	      in
 	      debug "Got response: leaf=%s" slave_attach_info.sa_leaf_path;
 	      
 	      with_master_approved_op context metadata id Attaching (fun () -> 
@@ -190,7 +198,7 @@ module VDI = struct
 			(* Make sure that we're attached... *)
 			Nmutex.execute context metadata.s_mutex "Making sure we're attached" (fun () ->
 				if not (Hashtbl.mem metadata.s_data.s_attached_vdis id) then
-					raise (IntError (e_not_attached, [id])));
+					raise (Int_rpc.IntError (e_not_attached, [id])));
 			
 			commit_slave_attach_info_to_disk metadata.s_data.s_sr id sai;
 
@@ -286,14 +294,22 @@ module VDI = struct
 					let savi = Hashtbl.find metadata.s_data.s_attached_vdis id in
 					savi.savi_attach_info.sa_writable
 				with Not_found -> 
-					raise (IntError (e_not_attached, [id])))
+					raise (Int_rpc.IntError (e_not_attached, [id])))
 			in
 
 			(* We can't be detached because of the 'with_op' fn above, so now we're safe *)
 			let sai = 
 				Int_client_utils.slave_retry_loop context [] (fun client -> 
 				  let module Client = (val client : Int_client.CLIENT) in
-				  Client.VDI.slave_attach ~host_uuid:(Global.get_host_uuid ()) ~sr:metadata.s_data.s_sr ~vdi:id ~writable ~is_reattach:true) metadata in
+				  let x = Client.VDI.slave_attach ~host_uuid:(Global.get_host_uuid ()) ~sr:metadata.s_data.s_sr ~vdi:id ~writable ~is_reattach:true in
+				  if !Global.dummy 
+				  then 
+				    { x with 
+				      sa_leaf_path = 
+					Printf.sprintf "%s/%s" (Global.get_host_local_dummydir ()) x.sa_leaf_path
+				    }
+				  else x
+				) metadata in
 			
 			debug "Got response: leaf=%s" sai.sa_leaf_path;
 			
@@ -336,7 +352,7 @@ module VDI = struct
 
 							  Client.VDI.slave_detach ~host_uuid:(Global.get_host_uuid ()) 
 							    ~sr:metadata.s_data.s_sr ~vdi:id) metadata
-						with IntError(e,args) as exn ->
+						with Int_rpc.IntError(e,args) as exn ->
 							if e=e_not_attached
 							then debug "Ignoring not_attached exception from master"
 							else raise exn
@@ -451,7 +467,7 @@ module VDI = struct
 
 				  Client.VDI.slave_deactivate ~host_uuid:(Global.get_host_uuid ()) ~sr:metadata.s_data.s_sr ~vdi:id) metadata
 			with
-				| IntError(e,args) as exn ->
+				| Int_rpc.IntError(e,args) as exn ->
 					if (e=e_not_activated)
 					then debug "Ignoring not_activated error"
 					else raise exn
@@ -535,7 +551,15 @@ module VDI = struct
 		  Int_client_utils.slave_retry_loop context [] (fun client -> 
 		    let module Client = (val client : Int_client.CLIENT) in
 		    
-		    Client.VDI.get_slave_attach_info ~sr:sr_uuid ~vdi:id) metadata in
+		    let x = Client.VDI.get_slave_attach_info ~sr:sr_uuid ~vdi:id in
+		    if !Global.dummy 
+		    then 
+		      { x with 
+			sa_leaf_path = 
+			  Printf.sprintf "%s/%s" (Global.get_host_local_dummydir ()) x.sa_leaf_path
+		      }
+		    else x) metadata 
+		in
 		let arg = Jsonrpc.to_string (rpc_of_slave_attach_info slave_attach_info) in
 (*		let call = Smapi_client.make_call ~vdi_location:id device_config (Some metadata.s_data.s_sr) "vdi_attach_from_config" [ arg ] in
 		let str = Xml.to_string (Smapi_client.xmlrpc_of_call call) in

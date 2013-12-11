@@ -503,10 +503,25 @@ module VDI = struct
 
 	let slave_reload ctx ~sr ~vdis =
 		let metadata = Attachments.gsm sr in
+		let vdis = 
+		  if !Global.dummy
+		  then List.map (fun (id,sai) ->
+		    (id,{sai with sa_leaf_path = 
+			Printf.sprintf "%s/%s" (Global.get_host_local_dummydir ()) sai.sa_leaf_path}))
+		    vdis
+		  else vdis
+		in
 		VhdSlave.VDI.slave_reload ctx metadata vdis
 
 	let slave_leaf_coalesce_stop_and_copy ctx ~sr ~vdi ~leaf_path ~new_leaf_path =
 		let metadata = Attachments.gsm sr in
+		let fix_path orig = 
+		  if !Global.dummy
+		  then Printf.sprintf "%s/%s" (Global.get_host_local_dummydir ()) orig
+		  else orig 
+		in
+		let leaf_path = fix_path leaf_path in
+		let new_leaf_path = fix_path new_leaf_path in
 		VhdSlave.VDI.slave_leaf_coalesce_stop_and_copy ctx metadata vdi leaf_path new_leaf_path
 
 	let external_clone ctx sr_uuid filename =
@@ -592,6 +607,7 @@ module Debug = struct
     Mutex.execute metadata.Vhd_types.s_mutex.Nmutex.m (fun () ->
       let v = Hashtbl.find metadata.Vhd_types.s_data.Vhd_types.s_attached_vdis vdi in
       let leaf_path = v.Vhd_types.savi_attach_info.Int_types.sa_leaf_path in
+      debug "XXX slave_get_leaf_vhduid: leaf_path=%s" leaf_path;
       Vhdutil.with_vhd leaf_path false (fun vhd -> 
 	Vhd.get_uid vhd))
   let write_junk ctx ~sr ~vdi ~size ~n ~current = 

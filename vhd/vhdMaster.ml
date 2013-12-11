@@ -754,7 +754,7 @@ end
 		Slave_sr_attachments.slave_sr_detach_by_host_uuid context metadata host_uuid;
 		let leaves = Locking.get_all_leaf_infos context metadata in
 		List.iter (fun (k,leaf_info) ->
-			try VDI.slave_detach context metadata host_uuid k with IntError(e_not_attached,_) -> ()) leaves
+			try VDI.slave_detach context metadata host_uuid k with Int_rpc.IntError(e_not_attached,_) -> ()) leaves
 
 	let set_rolling_upgrade_finished context metadata =
 		fix_ctx context None;
