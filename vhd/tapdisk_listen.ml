@@ -21,8 +21,24 @@ type td_info = {
 let h = Hashtbl.create 50
 let m = Mutex.create ()
 
+let get_stats_fname vhd_link =
+  Printf.sprintf "/dev/shm/%s.stats" (Filename.basename vhd_link)
+
+let exists name = try ignore (Unix.stat name); true with _ -> false
+
 let register (sr,id) vhd_link =
-  let f = Unix.openfile (Printf.sprintf "/dev/shm/%s.stats" (Filename.basename vhd_link)) [Unix.O_RDWR] 0 in
+  let fname = get_stats_fname vhd_link in
+  let f =
+    if !Global.dummy && not (exists fname)
+    then begin
+      let f = Unix.openfile fname [Unix.O_RDWR; Unix.O_CREAT] 0o666 in
+      Unix.write f (String.make 4096 '\000') 0 4096;
+      ignore(Unix.lseek f 0 Unix.SEEK_SET);
+      f
+    end else begin
+      Unix.openfile fname [Unix.O_RDWR] 0
+    end
+  in
   try
     let ba = Bigarray.Array1.map_file f Bigarray.char Bigarray.c_layout true 4096 in
     let cs = Cstruct.of_bigarray ba in
@@ -37,6 +53,15 @@ let register (sr,id) vhd_link =
 let unregister (sr,id) =
   debug "Unregistering %s/%s" sr id;
   Mutex.execute m (fun () ->
+    begin
+      try
+	if !Global.dummy
+	then begin 
+	  let x = Hashtbl.find h (sr,id) in
+	  Unixext.unlink_safe (get_stats_fname x.vhd_link);
+	end
+      with _ -> ()
+    end;
     Hashtbl.remove h (sr,id))
 
 let oneshot () =

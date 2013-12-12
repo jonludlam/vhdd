@@ -96,7 +96,7 @@ let activate dev sr_uuid id leaf ty =
 		t_pause dev;
 		Tapctl.unpause (ctx ()) dev link ty
 	end;
-        if not (!Global.dummy) then Tapdisk_listen.register (sr_uuid,id) link
+	Tapdisk_listen.register (sr_uuid,id) link
 
 let deactivate dev sr_uuid id leaf =
 	Tapdisk_listen.unregister (sr_uuid,id);
@@ -152,7 +152,7 @@ let scan () =
 								debug "host_uuid=%s sr_uuid=%s id=%s" host_uuid sr_uuid id;
 								let (other_end_sr_uuid,other_end_id) = List.assoc (Tapctl.get_minor tapdev) tapdev_links in
 								debug "other end: sr_uuid=%s id=%s" other_end_sr_uuid other_end_id;
-								if not (!Global.dummy) then Tapdisk_listen.register (sr_uuid,id) link;
+								Tapdisk_listen.register (sr_uuid,id) link;
 								Some (tapdev,sr_uuid, id, Some link)
 						  | _ -> None)
 			    | None -> 
@@ -164,5 +164,7 @@ let scan () =
 					  with _ ->
 						  Tapctl.detach (ctx ()) tapdev;
 						  None
-		with _ -> None) blktaps
+		with e -> 
+		  debug "Caught exception scanning tapdisks: %s" (Printexc.to_string e);
+		  None) blktaps
 
