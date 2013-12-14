@@ -32,7 +32,8 @@ let register (sr,id) vhd_link =
     if !Global.dummy && not (exists fname)
     then begin
       let f = Unix.openfile fname [Unix.O_RDWR; Unix.O_CREAT] 0o666 in
-      Unix.write f (String.make 4096 '\000') 0 4096;
+      let written = Unix.write f (String.make 4096 '\000') 0 4096 in
+      (if written != 4096 then failwith "Error creating shared mem");
       ignore(Unix.lseek f 0 Unix.SEEK_SET);
       f
     end else begin
@@ -45,7 +46,7 @@ let register (sr,id) vhd_link =
     Mutex.execute m (fun () ->
       Hashtbl.replace h (sr,id) {cs; next_db=0l; vhd_link;});
     Unix.close f;
-    debug "Registered to listen to /dev/shm/%s" vhd_link
+    debug "Registered to listen to %s" fname
   with e ->
     Unix.close f;
     raise e
@@ -93,6 +94,15 @@ let rec loop () =
   with e ->
     debug "Caught exception in Tapdisk_listen.loop: %s" (Printexc.to_string e);
     loop ()
+
+let debug_write (sr,id) next_db =
+  let st = Mutex.execute m (fun () -> Hashtbl.find h (sr,id)) in
+  let str = Printf.sprintf "%Ld" next_db in
+  let len = String.length str in
+  let crc = Zlib.update_crc Int32.zero str 0 len in
+  Cstruct.blit_from_string str 0 (get_tapdisk_stats_msg st.cs) 0 len;
+  set_tapdisk_stats_checksum st.cs crc;
+  set_tapdisk_stats_len st.cs (Int32.of_int len)
 
 let start () =
   Thread.create loop ()

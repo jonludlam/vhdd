@@ -75,59 +75,59 @@ module VDI = struct
 	let with_master_approved_op context metadata id op = with_op_inner context "Adding to master_approved_ops" (Tracelog.Slave_s_master_approved_ops_add (id,op)) "Removing from master_approved_ops" (Tracelog.Slave_s_master_approved_ops_remove id) metadata.s_data.s_master_approved_ops metadata id op
 
 	let attach_from_sai context metadata id slave_attach_info =
-		let sr_uuid = metadata.s_data.s_sr in
-        
-		let cleanup_funcs = ref [] in
-        let add_to_cleanup_funcs f =
+	  let sr_uuid = metadata.s_data.s_sr in
+          
+	  let cleanup_funcs = ref [] in
+          let add_to_cleanup_funcs f =
             cleanup_funcs := f :: (!cleanup_funcs) in
-        let exec_cleanup_funcs () =
+          let exec_cleanup_funcs () =
             List.iter (fun f -> f ()) !cleanup_funcs
-        in
-
-		List.iter (fun dmn ->
-			debug "LV name: %s" (match dmn with | Mlvm x -> x.dmn_dm_name)) slave_attach_info.sa_lvs;
-
-		try
+          in
+	  
+	  List.iter (fun dmn ->
+	    debug "LV name: %s" (match dmn with | Mlvm x -> x.dmn_dm_name)) slave_attach_info.sa_lvs;
+	  
+	  try
 			(* Attach the LVs if necessary *)
-			begin
-				try
-					List.iter (fun dmn ->
-						ignore(Host.attach_lv dmn);
-						add_to_cleanup_funcs (fun () -> Host.remove_lv dmn)
-					) slave_attach_info.sa_lvs
-				with e ->
-					log_backtrace ();
-					debug "Caught exception: %s" (Printexc.to_string e);
-					failwith "Could not attach all LVs"
-			end;
-			
-			let (tapdev,endpoint) = Tapdisk.attach sr_uuid id in
-			add_to_cleanup_funcs (fun () -> Tapdisk.detach tapdev sr_uuid id);
-			
-			debug "s_mutex lock: attach_from_sai";
-			Nmutex.execute context metadata.s_mutex "Adding info to s_attached_vdis"
-				(fun () ->
-					let savi= {
-						savi_attach_info = slave_attach_info;
-						savi_blktap2_dev = tapdev;
-						savi_resync_required = false;
-						savi_endpoint = endpoint;
-						savi_link = Tapdisk.get_vhd_link sr_uuid id slave_attach_info.sa_leaf_path;
-						savi_maxsize = slave_attach_info.sa_leaf_maxsize;
-						savi_phys_size = slave_attach_info.sa_leaf_phys_size;
-						savi_activated = false;
-						savi_paused=false;
-					} in
-					Hashtbl.replace metadata.s_data.s_attached_vdis id savi;
-					Tracelog.append context (Tracelog.Slave_s_attached_vdis_add (id,savi)) None;	
-					Html.signal_slave_metadata_change metadata ();
-				);
-			endpoint
-		with e ->
-			error "Caught unexpected exception: %s" (Printexc.to_string e);
-			exec_cleanup_funcs ();
-			raise e
-				
+	    begin
+	      try
+		List.iter (fun dmn ->
+		  ignore(Host.attach_lv dmn);
+		  add_to_cleanup_funcs (fun () -> Host.remove_lv dmn)
+		) slave_attach_info.sa_lvs
+	      with e ->
+		log_backtrace ();
+		debug "Caught exception: %s" (Printexc.to_string e);
+		failwith "Could not attach all LVs"
+	    end;
+		
+	    let (tapdev,endpoint) = Tapdisk.attach sr_uuid id in
+	    add_to_cleanup_funcs (fun () -> Tapdisk.detach tapdev sr_uuid id);
+	    
+	    debug "s_mutex lock: attach_from_sai";
+	    Nmutex.execute context metadata.s_mutex "Adding info to s_attached_vdis"
+	      (fun () ->
+		let savi= {
+		  savi_attach_info = slave_attach_info;
+		  savi_blktap2_dev = tapdev;
+		  savi_resync_required = false;
+		  savi_endpoint = endpoint;
+		  savi_link = Tapdisk.get_vhd_link sr_uuid id slave_attach_info.sa_leaf_path;
+		  savi_maxsize = slave_attach_info.sa_leaf_maxsize;
+		  savi_phys_size = slave_attach_info.sa_leaf_phys_size;
+		  savi_activated = false;
+		  savi_paused=false;
+		} in
+		Hashtbl.replace metadata.s_data.s_attached_vdis id savi;
+		Tracelog.append context (Tracelog.Slave_s_attached_vdis_add (id,savi)) None;	
+		Html.signal_slave_metadata_change metadata ();
+	      );
+	    endpoint
+	  with e ->
+	    error "Caught unexpected exception: %s" (Printexc.to_string e);
+	    exec_cleanup_funcs ();
+	    raise e
+	      
 	let attach context metadata vdi writable =
 	  let id = vdi in
 	  fix_ctx context (Some id);
@@ -775,85 +775,87 @@ module SR = struct
 		end
 
 	let thin_provision_check context metadata =
-		fix_ctx context None;
-		debug "Thin provision check";
-		let in_progress =
-			Nmutex.execute context metadata.s_mutex "Checking whether thin provision request is in progress" (fun () ->
-				let cur = metadata.s_data.s_thin_provision_request_in_progress in
-				metadata.s_data.s_thin_provision_request_in_progress <- true;
-				Tracelog.append context (Tracelog.Slave_s_thin_provision_request_in_progress true) None;
-				Html.signal_slave_metadata_change metadata ();
-				cur)
-		in
-		if in_progress then begin
-			debug "thin provision request is already in progress. returning"
-		end else begin
-			try
-			  debug "checkpoint 1";
-				if metadata.s_data.s_thin_provisioning then
-					let rec inner () =
-					  debug "checkpoint 2";
-						let need_resizing = Nmutex.execute context metadata.s_mutex "Checking who needs resizing" (fun () ->
-							Hashtbl.fold (fun k v acc ->
-								match v.savi_maxsize with
-									| None -> acc
-									| Some max ->
-										let check = Int64.sub max v.savi_phys_size in
-										debug "check=%Ld" check;
-										if check < Vhdutil.tp_lower_threshold
-										then ({vs_id=k; vs_size=v.savi_phys_size}::acc)
-										else acc) metadata.s_data.s_attached_vdis []) in
-						if List.length need_resizing > 0 then begin
-							let new_attach_infos = 
-								Int_client_utils.slave_retry_loop context [] (fun client -> 
-								  let module Client = (val client : Int_client.CLIENT) in
-								  
-								  Client.VDI.thin_provision_request_more_space ~sr:metadata.s_data.s_sr ~host_uuid:(Global.get_host_uuid ()) ~sizes:need_resizing) metadata in
-							debug "New attach infos: length=%d" (List.length new_attach_infos);
-							List.iter (function ai ->
-								Nmutex.execute context metadata.s_mutex "Changing VDI" (fun () ->
-									debug "Changing LV: %s" ai.dmn_dm_name;
-									match Hashtbl.fold (fun k v acc ->
-										if Filename.basename (v.savi_attach_info.sa_leaf_path) = ai.dmn_dm_name
-										then begin
-											Host.change_lv (Mlvm ai);
-											(if v.savi_paused then
-												(debug "Resuming tapdisk: id=%s" k;
-												Tapdisk.activate v.savi_blktap2_dev metadata.s_data.s_sr k v.savi_attach_info.sa_leaf_path
-													(if v.savi_attach_info.sa_leaf_is_raw then Tapctl.Aio else Tapctl.Vhd)));
-											Some (k,{v with savi_maxsize =
-													Some (Int64.mul 512L
-														(Array.fold_left (fun size map -> Int64.add map.Camldm.len size) 0L ai.dmn_mapping.Camldm.m))})
-
-										end else acc) metadata.s_data.s_attached_vdis None
-									with
-										| None -> ()
-										| Some (k,v) -> 
-											(Hashtbl.replace metadata.s_data.s_attached_vdis k v; 
-											Tracelog.append context (Tracelog.Slave_s_attached_vdis_update (k,v)) None;
-
-											Html.signal_slave_metadata_change metadata ()))) new_attach_infos;
-
-							inner ()
-						end
-					in inner ();
-				else
-				  debug "thin provisioning not enabled";
-				
-				Nmutex.execute context metadata.s_mutex "Unsetting thin provision request in progress" (fun () ->
-				  Tracelog.append context (Tracelog.Slave_s_thin_provision_request_in_progress false) None;
-				  metadata.s_data.s_thin_provision_request_in_progress <- false;
-				  Html.signal_slave_metadata_change metadata ();
-				)
-				  
-				  
-			with e ->
-				log_backtrace ();
-				debug "Caught exception while resizing: %s" (Printexc.to_string e);
-				Nmutex.execute context metadata.s_mutex "Unsetting thin provision request in progress" (fun () ->
-					metadata.s_data.s_thin_provision_request_in_progress <- false;
-					Html.signal_slave_metadata_change metadata ();
-				)
-		end
+	  fix_ctx context None;
+	  debug "Thin provision check";
+	  let in_progress =
+	    Nmutex.execute context metadata.s_mutex "Checking whether thin provision request is in progress" (fun () ->
+	      let cur = metadata.s_data.s_thin_provision_request_in_progress in
+	      metadata.s_data.s_thin_provision_request_in_progress <- true;
+	      Tracelog.append context (Tracelog.Slave_s_thin_provision_request_in_progress true) None;
+	      Html.signal_slave_metadata_change metadata ();
+	      cur)
+	  in
+	  if in_progress then begin
+	    debug "thin provision request is already in progress. returning"
+	  end else begin
+	    try
+	      debug "checkpoint 1";
+	      if metadata.s_data.s_thin_provisioning then
+		let rec inner () =
+		  debug "checkpoint 2";
+		  let need_resizing = Nmutex.execute context metadata.s_mutex "Checking who needs resizing" (fun () ->
+		    Hashtbl.fold (fun k v acc ->
+		      match v.savi_maxsize with
+		      | None -> acc
+		      | Some max ->
+			let check = Int64.sub max v.savi_phys_size in
+			debug "check=%Ld" check;
+			if check < Vhdutil.tp_lower_threshold
+			then ({vs_id=k; vs_size=v.savi_phys_size}::acc)
+			else acc) metadata.s_data.s_attached_vdis []) in
+		  if List.length need_resizing > 0 then begin
+		    let new_attach_infos = 
+		      Int_client_utils.slave_retry_loop context [] (fun client -> 
+			let module Client = (val client : Int_client.CLIENT) in
+			
+			Client.VDI.thin_provision_request_more_space ~sr:metadata.s_data.s_sr ~host_uuid:(Global.get_host_uuid ()) ~sizes:need_resizing) metadata in
+		    debug "New attach infos: length=%d" (List.length new_attach_infos);
+		    List.iter (function ai ->
+		      Nmutex.execute context metadata.s_mutex "Changing VDI" (fun () ->
+			debug "Changing LV: %s" ai.dmn_dm_name;
+			match Hashtbl.fold (fun vdi old_savi acc ->
+			  if Filename.basename (old_savi.savi_attach_info.sa_leaf_path) = ai.dmn_dm_name
+			  then begin
+			    Host.change_lv (Mlvm ai);
+			    (if old_savi.savi_paused then
+				(debug "Resuming tapdisk: id=%s" vdi;
+				 Tapdisk.activate old_savi.savi_blktap2_dev metadata.s_data.s_sr vdi old_savi.savi_attach_info.sa_leaf_path
+				   (if old_savi.savi_attach_info.sa_leaf_is_raw then Tapctl.Aio else Tapctl.Vhd)));
+			    Some (vdi,{
+			      old_savi with 
+				savi_maxsize = Some (Int64.mul 512L
+						       (Array.fold_left (fun size map -> Int64.add map.Camldm.len size) 0L ai.dmn_mapping.Camldm.m));
+				savi_attach_info = { old_savi.savi_attach_info with
+				  sa_lvs = List.map (fun x ->
+				    match x with | Mlvm d -> if d.dmn_dm_name = ai.dmn_dm_name then Mlvm ai else x) old_savi.savi_attach_info.sa_lvs } } )
+			      
+			  end else acc) metadata.s_data.s_attached_vdis None
+			with
+			| None -> ()
+			| Some (k,v) -> 
+			  (Hashtbl.replace metadata.s_data.s_attached_vdis k v; 
+			   Tracelog.append context (Tracelog.Slave_s_attached_vdis_update (k,v)) None;
+			   
+			   Html.signal_slave_metadata_change metadata ()))) new_attach_infos;
+		    
+		    inner ()
+		  end
+		in inner ();
+	      else
+		debug "thin provisioning not enabled";
+	      
+	      Nmutex.execute context metadata.s_mutex "Unsetting thin provision request in progress" (fun () ->
+		Tracelog.append context (Tracelog.Slave_s_thin_provision_request_in_progress false) None;
+		metadata.s_data.s_thin_provision_request_in_progress <- false;
+		Html.signal_slave_metadata_change metadata ();
+	      )	
+	    with e ->
+	      log_backtrace ();
+	      debug "Caught exception while resizing: %s" (Printexc.to_string e);
+	      Nmutex.execute context metadata.s_mutex "Unsetting thin provision request in progress" (fun () ->
+		metadata.s_data.s_thin_provision_request_in_progress <- false;
+		Html.signal_slave_metadata_change metadata ();
+	      )
+	  end
 
 end

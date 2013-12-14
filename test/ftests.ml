@@ -18,8 +18,10 @@ let real = ref false
 let can_create_raw = ref true
 
 let meg = Int64.mul 1024L 1024L
+let gig = Int64.mul meg 1024L
 let stddisksize = Int64.mul 50L meg
 let smallerdisksize = Int64.mul 40L meg
+let massivedisksize = Int64.mul 50L gig
 
 let dummy_context = {
 	Context.c_driver = "none";
@@ -158,7 +160,7 @@ module Dummy = struct
 		let master = List.hd vhdds in
 		let slaves = List.tl vhdds in
 
-		let device_config = ["device","/dev/dummy"] in
+		let device_config = ["device","/dev/dummy"; "reservation_mode","thin"] in
 
 		let slave_device_config = device_config in
 		let master_device_config = ("SRmaster","true")::device_config in
@@ -1347,6 +1349,86 @@ module Basic_tests = struct
 			vdi_double_attach_ro_with_double_activate; vdi_raw_attach_rw_multiple]
 end
 
+module ThinProvision = struct
+
+  let get_leaf_lv_size_from_attach_info attach_info =
+    let lv_name = Filename.basename attach_info.sa_leaf_path in
+    let lv = List.fold_left (fun acc x -> let Mlvm y = x in if y.dmn_dm_name = lv_name then Some y.dmn_mapping else acc) None attach_info.sa_lvs in
+    match lv with 
+    | Some mapping_array ->
+      let sectors = List.fold_left (fun acc x -> Int64.add acc x.Camldm.len) 0L (Array.to_list mapping_array.Camldm.m) in
+      Int64.mul sectors 512L
+    | None ->
+      failwith "No LV found!"
+
+  let thin_simple_test = 
+    make_test_case "thin_simple"
+      "Check that a thinly provisioned SR makes LVs smaller than virtual size"
+      begin fun () -> 
+	let state = (!init) () in
+	let master = List.hd state.vhdds in
+	let size = massivedisksize in
+	let (vdi,state) = create_vdi state size false in
+	attach_vdi state master.host_id vdi true;
+	activate_vdi state master.host_id vdi;
+	let module SC = (val master.intclient : Int_client.CLIENT) in
+	let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
+	let attached_vdi_info = Hashtbl.find attached_vdis vdi in
+	let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
+	let actualsize = get_leaf_lv_size_from_attach_info attach_info in
+	Printf.printf "%s\nsize=%Ld\n%!" (Jsonrpc.to_string (Int_types.rpc_of_slave_attach_info attach_info)) size;
+	deactivate_vdi state master.host_id vdi;
+	detach_vdi state master.host_id vdi;
+	!cleanup state;
+	if actualsize >= size then failwith "LV not thinly provisioned"	  
+      end
+
+  let thin_alloc_test = 
+    make_test_case "thin_alloc_test"
+      "Check that a thinly provisioned SR is expanded when tapdisk signals"
+      begin fun () -> 
+	let state = (!init) () in
+	let master = List.hd state.vhdds in
+	let size = massivedisksize in
+	let (vdi,state) = create_vdi state size false in
+	attach_vdi state master.host_id vdi true;
+	activate_vdi state master.host_id vdi;
+	let module SC = (val master.intclient : Int_client.CLIENT) in
+	let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
+	let attached_vdi_info = Hashtbl.find attached_vdis vdi in
+	let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
+	let actualsize = get_leaf_lv_size_from_attach_info attach_info in
+	Printf.printf "%s\nsize=%Ld\n%!" (Jsonrpc.to_string (Int_types.rpc_of_slave_attach_info attach_info)) size;
+
+	let vhd_link = Printf.sprintf "/dev/shm/%s_%s_%s" master.host_id state.sr vdi in
+	Tapdisk_listen.register (state.sr,vdi) vhd_link;
+	(* Pretend that we're writing at the 400 meg mark: *)
+	let next_db = Int64.div (Int64.mul 400L meg) 512L in (* it's in sectors *)
+	Tapdisk_listen.debug_write (state.sr,vdi) next_db;
+	Thread.delay 2.0;
+
+	Tapdisk_listen.unregister (state.sr,vdi);
+
+	let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
+	let attached_vdi_info = Hashtbl.find attached_vdis vdi in
+	let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
+	let actualsize2 = get_leaf_lv_size_from_attach_info attach_info in	  
+
+	if actualsize = actualsize2 then failwith "Failed to resize LV";
+
+
+	deactivate_vdi state master.host_id vdi;
+	detach_vdi state master.host_id vdi;
+	!cleanup state;
+
+      end
+
+  let tests = 
+    make_module_test_suite "ThinProvision"
+      [thin_simple_test; thin_alloc_test]
+
+end
+
 
 (*
 module Parallel_tests = struct
@@ -1811,6 +1893,7 @@ let _ =
 	let tests = make_module_test_suite "Vhdd"
 		([ Basic_tests.tests; Master_restart_tests.tests; (*Attach_from_config_tests.tests; Parallel_tests.parallel_test;
 		Coalesce_tests.tests;*)
+		   ThinProvision.tests;
 		Vhd_records.Tests.tests;
 		(*Killed_operations.get_tests ()*)] @
 			(if !pool then [ Basic_tests.tests2; Master_restart_tests.tests2; (*Attach_from_config_tests.tests2*) ] else []))

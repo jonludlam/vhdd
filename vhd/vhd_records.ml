@@ -182,6 +182,7 @@ let update_vhd_size context t vhduid newsize =
 	Nmutex.execute context t.lock
 		(Printf.sprintf "Update_vhd_size uid='%s'" vhduid)
 		(fun () ->
+			debug "newsize=%s" (Vhdutil.string_of_size newsize);
 			let vhd = Hashtbl.find t.hashtbl vhduid in
 			let newvhd = {vhd with size=newsize} in
 			Hashtbl.replace t.hashtbl vhduid newvhd;

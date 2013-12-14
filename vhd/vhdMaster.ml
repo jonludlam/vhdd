@@ -92,8 +92,13 @@ module VDI = struct
                   match Locking.with_container_write_lock context metadata (fun container ->
                                                           (* TODO: The next line is incorrect - physsize is the size with vhd overhead, but the function expects it without the overhead.
                                                              Could add a function to vhdutil to do the correct calculation (ie, min_phys_size=physsize) *)
-                    let container = Lvmabs.resize context container location (Vhdutil.size_with_thin_provisioning_overhead size) in
-                    (container,Lvmabs.get_attach_info context container location)) with
+		    let new_size = Vhdutil.size_with_thin_provisioning_overhead size in
+		    debug "new_size=%Ld - update LVM metadata" new_size;
+                    let container = Lvmabs.resize context container location new_size in
+		    let new_attach_info = Lvmabs.get_attach_info context container location in
+		    (match new_attach_info with | Some ai ->
+		      debug "new_attach_info=%s" (Jsonrpc.to_string (Int_types.rpc_of_lv_attach_info_t ai)) | _ -> ());
+                    (container,new_attach_info)) with
                   | _,Some (Mlvm ai) -> Some ai
                   | _ -> None
                 end else begin
