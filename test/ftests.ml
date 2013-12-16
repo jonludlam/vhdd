@@ -1351,6 +1351,9 @@ end
 
 module ThinProvision = struct
 
+  let size = massivedisksize
+
+
   let get_leaf_lv_size_from_attach_info attach_info =
     let lv_name = Filename.basename attach_info.sa_leaf_path in
     let lv = List.fold_left (fun acc x -> let Mlvm y = x in if y.dmn_dm_name = lv_name then Some y.dmn_mapping else acc) None attach_info.sa_lvs in
@@ -1361,72 +1364,71 @@ module ThinProvision = struct
     | None ->
       failwith "No LV found!"
 
+  let get_leaf_size state vhdd vdi =
+    let module SC = (val vhdd.intclient : Int_client.CLIENT) in
+    let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
+    let attached_vdi_info = Hashtbl.find attached_vdis vdi in
+    let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
+    get_leaf_lv_size_from_attach_info attach_info
+
   let thin_simple_test = 
     make_test_case "thin_simple"
       "Check that a thinly provisioned SR makes LVs smaller than virtual size"
       begin fun () -> 
 	let state = (!init) () in
 	let master = List.hd state.vhdds in
-	let size = massivedisksize in
 	let (vdi,state) = create_vdi state size false in
 	attach_vdi state master.host_id vdi true;
 	activate_vdi state master.host_id vdi;
-	let module SC = (val master.intclient : Int_client.CLIENT) in
-	let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
-	let attached_vdi_info = Hashtbl.find attached_vdis vdi in
-	let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
-	let actualsize = get_leaf_lv_size_from_attach_info attach_info in
-	Printf.printf "%s\nsize=%Ld\n%!" (Jsonrpc.to_string (Int_types.rpc_of_slave_attach_info attach_info)) size;
+	let actualsize = get_leaf_size state master vdi in
 	deactivate_vdi state master.host_id vdi;
 	detach_vdi state master.host_id vdi;
 	!cleanup state;
 	if actualsize >= size then failwith "LV not thinly provisioned"	  
       end
 
+      
+  let thin_alloc_inner state attach_host = 
+    let master = List.hd state.vhdds in
+    let (vdi,state) = create_vdi state size false in
+    attach_vdi state attach_host.host_id vdi true;
+    activate_vdi state attach_host.host_id vdi;
+    let actualsize = get_leaf_size state attach_host vdi in
+
+    let vhd_link = Printf.sprintf "/dev/shm/%s_%s_%s" attach_host.host_id state.sr vdi in
+    Tapdisk_listen.register (state.sr,vdi) vhd_link;
+	(* Pretend that we're writing at the 400 meg mark: *)
+    let next_db = Int64.div (Int64.mul 400L meg) 512L in (* it's in sectors *)
+    Tapdisk_listen.debug_write (state.sr,vdi) next_db;
+    Thread.delay 2.0;
+
+    Tapdisk_listen.unregister (state.sr,vdi);
+
+    let actualsize2 = get_leaf_size state attach_host vdi in
+
+    if actualsize = actualsize2 then failwith "Failed to resize LV";
+        
+    deactivate_vdi state attach_host.host_id vdi;
+    detach_vdi state attach_host.host_id vdi;
+    !cleanup state
+
   let thin_alloc_test = 
     make_test_case "thin_alloc_test"
       "Check that a thinly provisioned SR is expanded when tapdisk signals"
-      begin fun () -> 
-	let state = (!init) () in
-	let master = List.hd state.vhdds in
-	let size = massivedisksize in
-	let (vdi,state) = create_vdi state size false in
-	attach_vdi state master.host_id vdi true;
-	activate_vdi state master.host_id vdi;
-	let module SC = (val master.intclient : Int_client.CLIENT) in
-	let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
-	let attached_vdi_info = Hashtbl.find attached_vdis vdi in
-	let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
-	let actualsize = get_leaf_lv_size_from_attach_info attach_info in
-	Printf.printf "%s\nsize=%Ld\n%!" (Jsonrpc.to_string (Int_types.rpc_of_slave_attach_info attach_info)) size;
+      begin fun () -> let state = (!init) () in (thin_alloc_inner state (List.hd state.vhdds)) end
 
-	let vhd_link = Printf.sprintf "/dev/shm/%s_%s_%s" master.host_id state.sr vdi in
-	Tapdisk_listen.register (state.sr,vdi) vhd_link;
-	(* Pretend that we're writing at the 400 meg mark: *)
-	let next_db = Int64.div (Int64.mul 400L meg) 512L in (* it's in sectors *)
-	Tapdisk_listen.debug_write (state.sr,vdi) next_db;
-	Thread.delay 2.0;
-
-	Tapdisk_listen.unregister (state.sr,vdi);
-
-	let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
-	let attached_vdi_info = Hashtbl.find attached_vdis vdi in
-	let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
-	let actualsize2 = get_leaf_lv_size_from_attach_info attach_info in	  
-
-	if actualsize = actualsize2 then failwith "Failed to resize LV";
-
-
-	deactivate_vdi state master.host_id vdi;
-	detach_vdi state master.host_id vdi;
-	!cleanup state;
-
-      end
+  let thin_alloc_slave = 
+    make_test_case "thin_alloc_slave"
+      "Check that a thinly provisioned SR is expanded when tapdisk signals"
+      begin fun () -> let state = (!init) () in (thin_alloc_inner state (List.hd (List.tl state.vhdds))) end
 
   let tests = 
     make_module_test_suite "ThinProvision"
       [thin_simple_test; thin_alloc_test]
 
+  let tests2 = 
+    make_module_test_suite "ThinProvision2"
+      [thin_alloc_slave]
 end
 
 
@@ -1896,7 +1898,7 @@ let _ =
 		   ThinProvision.tests;
 		Vhd_records.Tests.tests;
 		(*Killed_operations.get_tests ()*)] @
-			(if !pool then [ Basic_tests.tests2; Master_restart_tests.tests2; (*Attach_from_config_tests.tests2*) ] else []))
+			(if !pool then [ Basic_tests.tests2; Master_restart_tests.tests2; ThinProvision.tests2 (*Attach_from_config_tests.tests2*) ] else []))
 	in
 
 	let index = index_of_test tests in

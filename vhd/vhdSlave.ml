@@ -536,9 +536,7 @@ module VDI = struct
 		then
 			ignore(Thread.create (fun () ->
 			  debug "thin_provision_check call thread created";
-				Int_client_utils.slave_retry_loop context [] (fun client -> 
-				  let module Client = (val client : Int_client.CLIENT) in
-				  Client.SR.thin_provision_check ~sr:metadata.s_data.s_sr) metadata ) ())
+			  Int_client.LocalClient.SR.thin_provision_check ~sr:metadata.s_data.s_sr) ())
 		else
 		  debug "not bothering"
 
