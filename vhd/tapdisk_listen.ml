@@ -68,6 +68,21 @@ let unregister (sr,id) =
     end;
     Hashtbl.remove h (sr,id))
 
+let next_db_to_maxsize next_db =
+  let start_of_chunk_in_bytes = Int64.mul 512L next_db in
+  let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
+  let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
+  let maxsize = Int64.add end_of_chunk_including_bitmap 512L in
+  maxsize
+
+let maxsize_to_next_db maxsize =
+  let without_footer = Int64.sub maxsize 512L in
+  let without_bitmap = Int64.sub without_footer 4096L in
+  let start_of_chunk = Int64.sub without_bitmap 2097152L in
+  let sector_pos = Int64.div start_of_chunk 512L in
+  let next_db = Int64.to_int32 sector_pos in
+  next_db
+
 let oneshot () =
   Hashtbl.iter (fun (sr,vdi) st ->
     let len = Int32.to_int (get_tapdisk_stats_len st.read_cs) in
@@ -81,11 +96,8 @@ let oneshot () =
 	st.next_db <- next_db;
 	let size = Int64.of_int32 next_db in
 	debug "Got an update: next_db = %Ld" size;
-	let start_of_chunk_in_bytes = Int64.mul 512L size in
-	let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
-	let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
-	let with_footer = Int64.add end_of_chunk_including_bitmap 512L in
-	Int_client.LocalClient.VDI.slave_set_phys_size ~sr ~vdi ~size:with_footer;
+	let maxsize = next_db_to_maxsize size in
+	Int_client.LocalClient.VDI.slave_set_phys_size ~sr ~vdi ~size:maxsize;
       end
     end) h
 
@@ -99,11 +111,7 @@ let rec loop () =
     loop ()
 
 let write_maxsize (sr,id) maxsize =
-  let without_footer = Int64.sub maxsize 512L in
-  let without_bitmap = Int64.sub without_footer 4096L in
-  let start_of_chunk = Int64.sub without_bitmap 2097152L in
-  let sector_pos = Int64.div start_of_chunk 512L in
-  let next_db = Int64.to_int32 sector_pos in
+  let next_db = maxsize_to_next_db maxsize in
   let st = Mutex.execute m (fun () -> Hashtbl.find h (sr,id)) in
   let str = Printf.sprintf "%ld" next_db in
   let len = String.length str in
@@ -112,7 +120,8 @@ let write_maxsize (sr,id) maxsize =
   set_tapdisk_stats_checksum st.write_cs crc;
   set_tapdisk_stats_len st.write_cs (Int32.of_int len)
 
-let debug_write (sr,id) next_db =
+let debug_write (sr,id) maxsize =
+  let next_db = Int64.of_int32 (maxsize_to_next_db maxsize) in
   let st = Mutex.execute m (fun () -> Hashtbl.find h (sr,id)) in
   let str = Printf.sprintf "%Ld" next_db in
   let len = String.length str in
@@ -123,19 +132,19 @@ let debug_write (sr,id) next_db =
 
 let rec debug_read (sr,id) =
   let st = Mutex.execute m (fun () -> Hashtbl.find h (sr,id)) in
-  let len = Int32.to_int (get_tapdisk_stats_len st.read_cs) in
-  let crc = get_tapdisk_stats_checksum st.read_cs in
+  let len = Int32.to_int (get_tapdisk_stats_len st.write_cs) in
+  let crc = get_tapdisk_stats_checksum st.write_cs in
   let str = String.make len '\000' in
-  Cstruct.blit_to_string (get_tapdisk_stats_msg st.read_cs) 0 str 0 len;
+  Cstruct.blit_to_string (get_tapdisk_stats_msg st.write_cs) 0 str 0 len;
   let crc' = Zlib.update_crc Int32.zero str 0 len in
   if crc=crc' then begin
-    let next_db = Int32.of_string str in
-    let size = Int64.of_int32 next_db in
-    let start_of_chunk_in_bytes = Int64.mul 512L size in
-    let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
-    let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
-    let with_footer = Int64.add end_of_chunk_including_bitmap 512L in
-    with_footer
+    try 
+      let next_db = Int64.of_string str in
+      next_db_to_maxsize next_db
+    with e ->
+      let message = Printf.sprintf "Caught exception reading next_db: str=%s" str in
+      failwith message
+      
   end else debug_read (sr,id)
 
 let start () =

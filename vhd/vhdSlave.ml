@@ -393,7 +393,12 @@ module VDI = struct
 		Nmutex.execute context metadata.s_mutex "Activating tapdisk" (fun () ->
 			let savi = Hashtbl.find metadata.s_data.s_attached_vdis id in
 			Tapdisk.activate savi.savi_blktap2_dev metadata.s_data.s_sr id savi.savi_attach_info.sa_leaf_path
-				(if savi.savi_attach_info.sa_leaf_is_raw then Tapctl.Aio else Tapctl.Vhd);
+			  (if savi.savi_attach_info.sa_leaf_is_raw then Tapctl.Aio else Tapctl.Vhd);
+			debug "Setting maxsize in shared page";
+			(match savi.savi_attach_info.sa_leaf_maxsize with
+			| Some s ->
+			  debug "Setting maxsize=%Ld" s;
+			  Tapdisk_listen.write_maxsize (metadata.s_data.s_sr,id) s);
 			savi.savi_activated <- true;
 			Html.signal_slave_metadata_change metadata ();
 		)
