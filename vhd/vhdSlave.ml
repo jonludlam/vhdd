@@ -815,6 +815,9 @@ module SR = struct
 			  if Filename.basename (old_savi.savi_attach_info.sa_leaf_path) = ai.dmn_dm_name
 			  then begin
 			    Host.change_lv (Mlvm ai);
+			    let sectors = List.fold_left (fun acc x -> Int64.add acc x.Camldm.len) 0L (Array.to_list ai.dmn_mapping.Camldm.m) in
+			    let maxsize = Int64.mul sectors 512L in
+			    Tapdisk_listen.write_maxsize (metadata.s_data.s_sr,vdi) maxsize;
 			    (if old_savi.savi_paused then
 				(debug "Resuming tapdisk: id=%s" vdi;
 				 Tapdisk.activate old_savi.savi_blktap2_dev metadata.s_data.s_sr vdi old_savi.savi_attach_info.sa_leaf_path
