@@ -98,6 +98,20 @@ let rec loop () =
     debug "Caught exception in Tapdisk_listen.loop: %s" (Printexc.to_string e);
     loop ()
 
+let write_maxsize (sr,id) maxsize =
+  let without_footer = Int64.sub maxsize 512L in
+  let without_bitmap = Int64.sub without_footer 4096L in
+  let start_of_chunk = Int64.sub without_bitmap 2097152L in
+  let sector_pos = Int64.div start_of_chunk 512L in
+  let next_db = Int64.to_int32 sector_pos in
+  let st = Mutex.execute m (fun () -> Hashtbl.find h (sr,id)) in
+  let str = Printf.sprintf "%ld" next_db in
+  let len = String.length str in
+  let crc = Zlib.update_crc Int32.zero str 0 len in
+  Cstruct.blit_from_string str 0 (get_tapdisk_stats_msg st.write_cs) 0 len;
+  set_tapdisk_stats_checksum st.write_cs crc;
+  set_tapdisk_stats_len st.write_cs (Int32.of_int len)
+
 let debug_write (sr,id) next_db =
   let st = Mutex.execute m (fun () -> Hashtbl.find h (sr,id)) in
   let str = Printf.sprintf "%Ld" next_db in
@@ -106,6 +120,23 @@ let debug_write (sr,id) next_db =
   Cstruct.blit_from_string str 0 (get_tapdisk_stats_msg st.read_cs) 0 len;
   set_tapdisk_stats_checksum st.read_cs crc;
   set_tapdisk_stats_len st.read_cs (Int32.of_int len)
+
+let rec debug_read (sr,id) =
+  let st = Mutex.execute m (fun () -> Hashtbl.find h (sr,id)) in
+  let len = Int32.to_int (get_tapdisk_stats_len st.read_cs) in
+  let crc = get_tapdisk_stats_checksum st.read_cs in
+  let str = String.make len '\000' in
+  Cstruct.blit_to_string (get_tapdisk_stats_msg st.read_cs) 0 str 0 len;
+  let crc' = Zlib.update_crc Int32.zero str 0 len in
+  if crc=crc' then begin
+    let next_db = Int32.of_string str in
+    let size = Int64.of_int32 next_db in
+    let start_of_chunk_in_bytes = Int64.mul 512L size in
+    let end_of_chunk_in_bytes = Int64.add start_of_chunk_in_bytes 2097152L in
+    let end_of_chunk_including_bitmap = Int64.add end_of_chunk_in_bytes 4096L in
+    let with_footer = Int64.add end_of_chunk_including_bitmap 512L in
+    with_footer
+  end else debug_read (sr,id)
 
 let start () =
   Thread.create loop ()
