@@ -74,7 +74,7 @@ module Dummy = struct
 			"-fileserver";
 			"-htdocs"; "/myrepos/vhdd.hg/html";
 			"-nodaemon";
-			"-t";
+			(*"-t";*)
 			"1>";
 			logfile;
 			"2>";
@@ -191,7 +191,7 @@ module Dummy = struct
 
 	let init () =
 		let vhdds =
-			(start_vhdd 4094 "1") :: (if !pool then [start_vhdd 4095 "2"] else [])
+			(start_vhdd 4094 "1") :: (if !pool then [start_vhdd 4095 "2"; (*start_vhdd 4096 "3"; start_vhdd 4097 "4"; start_vhdd 4098 "5"; start_vhdd 4099 "6"; start_vhdd 4100 "7"; start_vhdd 4101 "8"*)] else [])
 		in
 		incr counter;
 		create_and_attach vhdds
@@ -1364,12 +1364,17 @@ module ThinProvision = struct
     | None ->
       failwith "No LV found!"
 
-  let get_leaf_size state vhdd vdi =
+  let get_leaf_sizes state vhdd vdis =
     let module SC = (val vhdd.intclient : Int_client.CLIENT) in
     let attached_vdis = SC.Debug.get_attached_vdis ~sr:state.sr in
-    let attached_vdi_info = Hashtbl.find attached_vdis vdi in
-    let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
-    get_leaf_lv_size_from_attach_info attach_info
+    List.map (fun vdi ->
+      let attached_vdi_info = Hashtbl.find attached_vdis vdi in
+      let attach_info = attached_vdi_info.Vhd_types.savi_attach_info in
+      get_leaf_lv_size_from_attach_info attach_info) vdis
+
+  let get_leaf_size state vhdd vdi =
+    let sizes = get_leaf_sizes state vhdd [vdi] in
+    List.hd sizes
 
   let thin_simple_test = 
     make_test_case "thin_simple"
@@ -1397,8 +1402,10 @@ module ThinProvision = struct
 
     let vhd_link = Printf.sprintf "/dev/shm/%s_%s_%s" attach_host.host_id state.sr vdi in
     Tapdisk_listen.register (state.sr,vdi) vhd_link;
+    let maxsize = Tapdisk_listen.debug_read (state.sr,vdi) in
+    Printf.printf "maxsize=%Ld\n%!" maxsize;
 	(* Pretend that we're writing at the 400 meg mark: *)
-    let next_db = Int64.div (Int64.mul 400L meg) 512L in (* it's in sectors *)
+    let next_db = Int64.mul 400L meg in (* it's in sectors *)
     Tapdisk_listen.debug_write (state.sr,vdi) next_db;
     Thread.delay 2.0;
 
@@ -1412,6 +1419,73 @@ module ThinProvision = struct
     detach_vdi state attach_host.host_id vdi;
     !cleanup state
 
+  let stress () =
+    let state = (!init) () in
+    let master = List.hd state.vhdds in
+    let slaves = List.tl state.vhdds in
+    let disks_per_host = 50 in
+    let size = gig in
+    let setup_host (state,vdis) host =
+      let rec inner (state,vdis) n = 
+	if n=0 then (state,vdis) else begin
+	  let (vdi,state) = create_vdi state size false in
+	  attach_vdi state host.host_id vdi true;
+	  activate_vdi state host.host_id vdi;
+	  let vhd_link = Printf.sprintf "/dev/shm/%s_%s_%s" host.host_id state.sr vdi in
+	  Tapdisk_listen.register (state.sr,vdi) vhd_link;
+	  inner (state,(vdi,host)::vdis) (n-1)
+	end in inner (state,vdis) disks_per_host
+    in 
+    let time0 = Unix.gettimeofday () in
+    let (state,vdis) = List.fold_left setup_host (state,[]) state.vhdds in
+    let time = Unix.gettimeofday () in
+    Printf.printf "Time taken to create and attach %d VDIs: %f\n%!" (List.length vdis) (time -. time0);
+    let current = Hashtbl.create 1000 in
+    let oomtimes = Hashtbl.create 1000 in
+    let sectors_per_meg = 2048L in
+    let rec stress () =
+      if Unix.gettimeofday () > (time +. 90.0) then () else begin
+	List.iter (fun (vdi,_) ->
+	  if (try ignore(Hashtbl.find current vdi); false with _ -> true) then
+	    Hashtbl.replace current vdi 0L;
+	  if (try ignore(Hashtbl.find oomtimes vdi); false with _ -> true) then
+	    Hashtbl.replace oomtimes vdi 0;
+	  let maxsize = Tapdisk_listen.debug_read (state.sr,vdi) in
+	  let cur = Hashtbl.find current vdi in
+	  let oomsofar = Hashtbl.find oomtimes vdi in
+	  debug "%s: maxsize = %Ld" vdi maxsize;
+	  if (Int64.mul cur meg) > maxsize then begin
+	    Printf.printf "vdi %s is out of space\n%!" vdi;
+	    Hashtbl.replace oomtimes vdi (oomsofar + 1);
+	  end;
+	  if (Random.float 1.0 > 0.9) && (Unix.gettimeofday () < (time +. 60.0)) then begin
+	    let new_cur = Int64.add cur 10L in
+
+	    Tapdisk_listen.debug_write (state.sr,vdi) (Int64.mul new_cur meg);
+	    Hashtbl.replace current vdi new_cur
+	  end) vdis;
+	Thread.delay 0.5;
+	stress ()
+      end;
+    in
+    stress ();
+    let times = List.map (fun (vdi,_) ->
+      let oomtime = Hashtbl.find oomtimes vdi in
+      (vdi,oomtime)) vdis in
+    let sorted = List.sort (fun (_,x) (_,y) -> compare x y) times in
+    List.iter (fun (vdi,time) ->
+      Printf.printf "%d %s\n" time vdi) sorted;
+    List.iter (fun vhdd ->
+      let vdis = List.filter (fun (vdi,host) -> host.host_id = vhdd.host_id) vdis in
+      let actualsizes = get_leaf_sizes state vhdd (List.map fst vdis) in
+      List.iter2 (fun (vdi,_) actualsize ->
+	let cur = Hashtbl.find current vdi in
+	if actualsize < cur then begin
+	  debug "vdi %s: actualsize=%Ld cur=%Ld" vdi actualsize cur;
+	  failwith "VDI too small"
+	end) vdis actualsizes) state.vhdds;
+    (!cleanup) state
+	    
   let thin_alloc_test = 
     make_test_case "thin_alloc_test"
       "Check that a thinly provisioned SR is expanded when tapdisk signals"
@@ -1422,13 +1496,18 @@ module ThinProvision = struct
       "Check that a thinly provisioned SR is expanded when tapdisk signals"
       begin fun () -> let state = (!init) () in (thin_alloc_inner state (List.hd (List.tl state.vhdds))) end
 
+  let thin_alloc_stress = 
+    make_test_case "thin_alloc_stress"
+      "Stress test of thin provisioning"
+      stress
+
   let tests = 
     make_module_test_suite "ThinProvision"
       [thin_simple_test; thin_alloc_test]
 
   let tests2 = 
     make_module_test_suite "ThinProvision2"
-      [thin_alloc_slave]
+      [thin_alloc_slave; thin_alloc_stress ]
 end
 
 
