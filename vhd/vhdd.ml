@@ -38,7 +38,7 @@ let xmlrpc_handler req fd () =
 	let str = Xmlrpc.string_of_response result in
 	Tracelog.append context (Tracelog.SmapiResult {Tracelog.result=str;}) None;
 	Tracelog.dump "/tmp/tracelog";
-	debug "Response: %s" str;
+	debug "Response: (omitted)";
 	Http_svr.response_str req fd str
 
 let internal_handler req fd () =
