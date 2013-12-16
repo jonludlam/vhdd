@@ -13,7 +13,8 @@ cstruct tapdisk_stats {
 } as little_endian
 
 type td_info = {
-  cs : Cstruct.t;
+  read_cs : Cstruct.t;
+  write_cs : Cstruct.t;
   vhd_link : string;
   mutable next_db : Int32.t
 }
@@ -43,8 +44,10 @@ let register (sr,id) vhd_link =
   try
     let ba = Bigarray.Array1.map_file f Bigarray.char Bigarray.c_layout true 4096 in
     let cs = Cstruct.of_bigarray ba in
+    let read_cs = Cstruct.sub cs 0 2048 in
+    let write_cs = Cstruct.sub cs 2048 2048 in
     Mutex.execute m (fun () ->
-      Hashtbl.replace h (sr,id) {cs; next_db=0l; vhd_link;});
+      Hashtbl.replace h (sr,id) {read_cs; write_cs; next_db=0l; vhd_link;});
     Unix.close f;
     debug "Registered to listen to %s" fname
   with e ->
@@ -67,10 +70,10 @@ let unregister (sr,id) =
 
 let oneshot () =
   Hashtbl.iter (fun (sr,vdi) st ->
-    let len = Int32.to_int (get_tapdisk_stats_len st.cs) in
-    let crc = get_tapdisk_stats_checksum st.cs in
+    let len = Int32.to_int (get_tapdisk_stats_len st.read_cs) in
+    let crc = get_tapdisk_stats_checksum st.read_cs in
     let str = String.make len '\000' in
-    Cstruct.blit_to_string (get_tapdisk_stats_msg st.cs) 0 str 0 len;
+    Cstruct.blit_to_string (get_tapdisk_stats_msg st.read_cs) 0 str 0 len;
     let crc' = Zlib.update_crc Int32.zero str 0 len in
     if crc=crc' then begin
       let next_db = Int32.of_string str in
@@ -100,9 +103,9 @@ let debug_write (sr,id) next_db =
   let str = Printf.sprintf "%Ld" next_db in
   let len = String.length str in
   let crc = Zlib.update_crc Int32.zero str 0 len in
-  Cstruct.blit_from_string str 0 (get_tapdisk_stats_msg st.cs) 0 len;
-  set_tapdisk_stats_checksum st.cs crc;
-  set_tapdisk_stats_len st.cs (Int32.of_int len)
+  Cstruct.blit_from_string str 0 (get_tapdisk_stats_msg st.read_cs) 0 len;
+  set_tapdisk_stats_checksum st.read_cs crc;
+  set_tapdisk_stats_len st.read_cs (Int32.of_int len)
 
 let start () =
   Thread.create loop ()
