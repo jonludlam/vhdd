@@ -299,7 +299,7 @@ let create_metadata context container name use_mgt =
 						Lvm.Vg.create_lv vg lv_name metadata_extents
 					end
 				in
-				(VolumeGroup (Lvm.Vg.write vg true),location_info)
+				(VolumeGroup (Lvm.Vg.write vg false),location_info)
 			| FileSystem fspath ->
 				begin
 					let path = Printf.sprintf "%s/%s" fspath name in
@@ -354,7 +354,7 @@ let resize context container location_info new_size =
 					(Int64.add new_size Lvm.Constants.extent_size_minus_one)
 					Lvm.Constants.extent_size in
 			let vg = Lvm.Vg.resize_lv vg lv.Lvm.Lv.name size_in_extents in
-			let container = VolumeGroup (Lvm.Vg.write vg true) in
+			let container = VolumeGroup (Lvm.Vg.write vg false) in
 			let lv_name = lv.Lvm.Lv.name in
 			append_lv_resize container location_info lv_name;
 			container
@@ -369,7 +369,7 @@ let resize context container location_info new_size =
 let commit context container =
 	match container with
 		| VolumeGroup vg ->
-			VolumeGroup (Lvm.Vg.write vg true)
+			VolumeGroup (Lvm.Vg.write vg false)
 		| _ ->
 			container
 
@@ -445,7 +445,7 @@ let get_sr_sizes context container =
 
 let write context container location str =
     with_active_vhd context container location false (fun ty f ->
-		debug "Writing: %s to path: %s" str f;
+(*		debug "Writing: %s to path: %s" str f;*)
 		assert(ty=Lvmabs_types.Metadata);
 		Circ.write f str
 	)

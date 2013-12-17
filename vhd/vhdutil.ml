@@ -17,10 +17,10 @@ let two_mib = mul 2L mib
 let two_mib_minus_1 = sub two_mib 1L
 
 (* Thin provisioning thresholds *)
-let tp_overhead = mul mib 500L
-let tp_threshold = mul mib 250L
-let tp_lower_threshold = mul mib 375L
-let tp_emergency_threshold = mul mib 50L
+let tp_overhead = mul mib 100L
+let tp_threshold = mul mib 50L
+let tp_lower_threshold = mul mib 75L
+let tp_emergency_threshold = mul mib 10L
 
 (* critical size is only used for thin provisioning *)
 type size = {
@@ -99,13 +99,7 @@ let query_size_vhd vhd =
 	critical_size = Int64.add tp_threshold phys_size}
 
 let query_size nod =
-	if !Global.dummy then
-		{ overhead = 1000000L;
-		phys_size = 10000000L;
-		virtual_size = 100000000L;
-		critical_size = 20000000L}
-	else
-		with_vhd nod false query_size_vhd
+  with_vhd nod false query_size_vhd
 
 (** set_hidden: This takes a Vhd.t and sets the hidden field appropriately. 1==OK for moving data, 2==OK for relinking.
 	It returns a tuple of the phys_size and the hidden value *)

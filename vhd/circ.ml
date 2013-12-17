@@ -93,7 +93,6 @@ let write_header fd h =
 
 let write path str =
 	let fd = Unix.openfile path [Unix.O_RDWR] 0o000 in
-	debug "Writing: %s" str;
 	Pervasiveext.finally
 		(fun () ->
 			let header = read_header fd in

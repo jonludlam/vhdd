@@ -12,9 +12,9 @@ let get_headers host path content_length task_id =
 		
 let rpc path call transport task_id =
   let open Xmlrpc_client in
-      let str = Jsonrpc.to_string call in
+      let str = Jsonrpc.string_of_call call in
       let http = xmlrpc ~version:"1.0" ~keep_alive:false ~body:str ~task_id ~length:(Int64.of_int (String.length str)) path in
-      Jsonrpc.of_string (with_transport transport (fun fd ->
+      Jsonrpc.response_of_string (with_transport transport (fun fd ->
 	Http_client.rpc fd http (fun response fd -> 
 	  match response.Http.Response.content_length with
             | Some len ->
@@ -24,7 +24,7 @@ let rpc path call transport task_id =
 	)))
 	  
 
-let local_rpc : ((string -> Rpc.t -> Rpc.t) ref) = ref
+let local_rpc : ((string -> Rpc.call -> Rpc.response) ref) = ref
   (fun task_id call ->
     try
       let path = Printf.sprintf "/fd_dispatch/vhdd/internal?pool_secret=%s" (Http.urlencode (Global.get_pool_secret ())) in

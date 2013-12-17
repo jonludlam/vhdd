@@ -6,7 +6,7 @@ module D=Debug.Make(struct let name="parallel_test" end)
 open D
 
 let meg = Int64.mul 1024L 1024L
-let measure_call intrpc fn response id =
+let measure_call intclient fn response id =
 	let finished = ref false in
 	let m = Mutex.create () in
 	let test_thread () =
@@ -16,13 +16,14 @@ let measure_call intrpc fn response id =
 	ignore(Thread.create test_thread ());
 	let rec inner n =
 		if Mutex.execute m (fun () -> !finished) then n else begin
-			let waiting=Int_client.Debug.waiting_locks_get intrpc in
+		  let module Client = (val intclient : Int_client.CLIENT) in
+			let waiting=Client.Debug.waiting_locks_get () in
 			if not (List.exists (fun (k,v) -> v.lc_context.c_task_id=id) waiting) then begin
 				Thread.delay 0.1;
 				inner n
 			end else begin
 				let (lock,_) = List.find (fun (k,v) -> v.lc_context.c_task_id=id) waiting in
-				Int_client.Debug.waiting_lock_unwait intrpc lock;
+				Client.Debug.waiting_lock_unwait ~lock;
 				inner (n+1)       
 			end
 		end

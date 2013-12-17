@@ -19,7 +19,7 @@ SOURCES = \
 	olvm \
 	int_types \
 	extentlist \
-	int_rpc \
+	junk \
 	nmutex \
 	lockgen \
 	host \
@@ -30,6 +30,7 @@ SOURCES = \
 	vhdrpc \
 	vhd_records \
 	vhd_types \
+	int_rpc \
 	int_client \
 	tapdisk_listen \
 	tapdisk \

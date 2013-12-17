@@ -45,7 +45,7 @@ let get_leaf_info metadata vdi_location =
 	try
 		Hashtbl.find metadata.m_data.m_id_to_leaf_mapping vdi_location
 	with Not_found ->
-		raise (IntError (e_unknown_location, [vdi_location]))
+		raise (Int_rpc.IntError (e_unknown_location, [vdi_location]))
 
 let set_leaf_info metadata vdi_location leaf_info =
 	Hashtbl.replace metadata.m_data.m_id_to_leaf_mapping vdi_location leaf_info
@@ -112,7 +112,7 @@ let slave_attach_reattach context metadata host vdi_location rw protected_fn =
 
 let slave_attach_unlock context metadata host vdi_location protected_fn =
 	with_leaf_op context metadata vdi_location OpDetaching (fun leaf_info -> 
-		let e = IntError(e_not_attached,[vdi_location]) in
+		let e = Int_rpc.IntError(e_not_attached,[vdi_location]) in
 		let leaf_info = update_leaf context metadata vdi_location (fun leaf_info ->
 			let new_attachment =
 				match leaf_info.attachment with
@@ -154,35 +154,35 @@ let slave_activate context metadata host vdi_location is_reactivate =
 				| Some (ActiveRW host'), _ ->
 					  if is_reactivate then begin
 						  if host<>host' then
-							  raise (IntError (e_vdi_active_elsewhere, [vdi_location]))
+							  raise (Int_rpc.IntError (e_vdi_active_elsewhere, [vdi_location]))
 						  else
 							  leaf_info
 					  end else
-						  raise (IntError (e_vdi_active_elsewhere, [vdi_location]))
+						  raise (Int_rpc.IntError (e_vdi_active_elsewhere, [vdi_location]))
 
 				| None, Some (AttachedRW hosts) ->
 					  let israw = match leaf_info.leaf with | PRaw _ -> true | PVhd _ -> false in
 					  if not (List.mem host hosts) then 
-						  raise (IntError (e_vdi_not_attached, [vdi_location]));
+						  raise (Int_rpc.IntError (e_vdi_not_attached, [vdi_location]));
 					  if israw 
 					  then {leaf_info with active_on = Some (ActiveRWRaw [host])} 
 					  else {leaf_info with active_on = Some (ActiveRW host)}
 
 				| Some (ActiveRWRaw acthosts), Some (AttachedRW atthosts) ->
 					  if not (List.mem host atthosts) then 
-						  raise (IntError (e_vdi_not_attached, [vdi_location]));
+						  raise (Int_rpc.IntError (e_vdi_not_attached, [vdi_location]));
 					  if not is_reactivate then (if (List.mem host acthosts) then failwith "Double activated!?");
 					  {leaf_info with active_on = Some (ActiveRWRaw (host::(List.filter (fun h -> h <> host) acthosts)))}
 
 				| _, None ->
-					  raise (IntError (e_vdi_not_attached, [vdi_location]))
+					  raise (Int_rpc.IntError (e_vdi_not_attached, [vdi_location]))
 
 				| _ -> 
 					  failwith "Unexpected attachment status!"))
 
 let slave_deactivate context metadata host vdi_location =
 	with_leaf_op context metadata vdi_location OpDeactivating (fun leaf_info -> 
-		let e = IntError(e_not_activated,[vdi_location]) in
+		let e = Int_rpc.IntError(e_not_activated,[vdi_location]) in
 		update_leaf context metadata vdi_location (fun leaf_info ->
 			match leaf_info.active_on with
 				| Some (ActiveRO hosts) ->

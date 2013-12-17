@@ -1,7 +1,5 @@
 open Camldm
 
-exception IntError of (string * (string list))
-
 let e_not_attached = "not_attached"
 let e_not_activated = "not_activated"
 let e_sr_not_attached = "host_not_attached"

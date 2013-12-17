@@ -182,6 +182,7 @@ let update_vhd_size context t vhduid newsize =
 	Nmutex.execute context t.lock
 		(Printf.sprintf "Update_vhd_size uid='%s'" vhduid)
 		(fun () ->
+			debug "newsize=%s" (Vhdutil.string_of_size newsize);
 			let vhd = Hashtbl.find t.hashtbl vhduid in
 			let newvhd = {vhd with size=newsize} in
 			Hashtbl.replace t.hashtbl vhduid newvhd;
@@ -343,8 +344,8 @@ let get_all_affected_vhds context t parent_ptr =
 				in
 				if inner k then k::acc else acc) t.hashtbl [])
 
-let get_vhd_records_rpc t =
-	Mutex.execute t.lock.Nmutex.m (fun () -> rpc_of_vhd_record_container t)
+let get_vhd_records t =
+  vhd_record_container_of_rpc (Mutex.execute t.lock.Nmutex.m (fun () -> rpc_of_vhd_record_container t))
 
 let get_coalesce_info context t = 
 	Nmutex.execute context t.lock "Getting coalesce info" (fun () -> 
