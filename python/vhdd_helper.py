@@ -43,8 +43,8 @@ def attach(target, port, iqn, scsiid):
         luns = iscsilib.get_luns(iqn, portal)
         infos = [get_probe_possibility(os.path.join("/dev/iscsi/",iqn,portal,"LUN%s" % lun),lun) for lun in luns]
         for info in infos:
-            if info['device_config']['SCSIid'] == scsiid:
-                return os.path.join("/dev/iscsi",iqn,portal,"LUN%s" % lun)
+            if info['info']['SCSIid'] == scsiid:
+                return os.path.join("/dev/iscsi",iqn,portal,"LUN%s" % info['info']['LUNid'])
         raise "Unknown SCSIid"
     except:
         iscsilib.logout(portal, iqn)
