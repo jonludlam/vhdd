@@ -796,7 +796,7 @@ module Killed_operations = struct
 		let ok = t0 a && t0 c && t0 e &&
 			((t0 b && t0 d && t0 f) || (t1 b && t1 d && t1 f)) in
 		if not ok then (print_endline (Printf.sprintf "clone_test: a=%d b=%d c=%d d=%d e=%d f=%d"
-			(l a) (l b) (l c) (l d) (l e) (l f)); exit 1; failwith "Error!")
+		(l a) (l b) (l c) (l d) (l e) (l f)); exit 1; failwith "Error!")
 
 	let clone_innertest (vdi,state,junk) =
 		let host = if List.length state.vhdds > 1 then List.hd (List.tl state.vhdds) else List.hd state.vhdds in
@@ -933,6 +933,7 @@ module Killed_operations = struct
 			Thread.create (fun () -> try ignore(op result name); finished := true with _ -> ()) ();
 			let rec inner i =
 				let rec get_lock time =
+				  Printf.printf "waiting...\n%!";
 					if time>600.0 then failwith "Waited too long";
 					if !finished then failwith "Unexpectedly finished!";
 					let locks = Intclient.Debug.waiting_locks_get () in
@@ -1976,7 +1977,7 @@ let _ =
 		Coalesce_tests.tests;*)
 		   ThinProvision.tests;
 		Vhd_records.Tests.tests;
-		(*Killed_operations.get_tests ()*)] @
+		(*Killed_operations.get_tests ();*)] @
 			(if !pool then [ Basic_tests.tests2; Master_restart_tests.tests2; ThinProvision.tests2 (*Attach_from_config_tests.tests2*) ] else []))
 	in
 

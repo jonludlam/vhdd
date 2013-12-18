@@ -18,11 +18,11 @@ let measure_call intclient fn response id =
 		if Mutex.execute m (fun () -> !finished) then n else begin
 		  let module Client = (val intclient : Int_client.CLIENT) in
 			let waiting=Client.Debug.waiting_locks_get () in
-			if not (List.exists (fun (k,v) -> v.lc_context.c_task_id=id) waiting) then begin
+			if List.length waiting =0 then begin
 				Thread.delay 0.1;
 				inner n
 			end else begin
-				let (lock,_) = List.find (fun (k,v) -> v.lc_context.c_task_id=id) waiting in
+				let (lock,_) = List.hd waiting in
 				Client.Debug.waiting_lock_unwait ~lock;
 				inner (n+1)       
 			end
