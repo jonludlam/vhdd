@@ -1,6 +1,6 @@
 (* Thread to listen to shared memory that tapdisk uses as comms *)
 
-open Stringext
+open Xstringext
 open Threadext
 
 module D=Debug.Make(struct let name="tapdisk_listen" end)

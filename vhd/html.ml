@@ -3,7 +3,7 @@ open Listext
 open Pervasiveext
 open Vhd_types
 open Int_types
-open Stringext
+open Xstringext
 open Threadext
 open Vhd_records
 open Context

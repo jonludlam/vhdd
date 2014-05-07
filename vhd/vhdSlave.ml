@@ -1,7 +1,7 @@
 (* Slave! *)
 open Vhd_types
 open Threadext
-open Stringext
+open Xstringext
 open Drivers
 open Int_types
 open Listext

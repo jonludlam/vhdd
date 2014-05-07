@@ -2,7 +2,7 @@
 
 open Int_types
 open Threadext
-open Stringext
+open Xstringext
 open Storage_interface
 
 type context = Context.t

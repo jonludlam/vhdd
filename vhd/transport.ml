@@ -1,5 +1,5 @@
 open Drivers
-open Stringext
+open Xstringext
 open Listext
 open Vhd_types
 

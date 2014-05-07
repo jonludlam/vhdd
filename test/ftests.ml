@@ -5,7 +5,7 @@ open Vhd_types
 open Int_types
 
 open Listext
-open Stringext
+open Xstringext
 open Threadext
 open Vhd_records
 open Storage_interface

@@ -1,5 +1,5 @@
 (* VHDD *)
-open Stringext
+open Xstringext
 
 module D=Debug.Make(struct let name="vhdd" end)
 open D

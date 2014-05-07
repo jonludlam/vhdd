@@ -1,5 +1,5 @@
 (* Try to detect the SR master from the attached_hosts location *)
-open Stringext
+open Xstringext
 open Int_types
 open Context
 open Vhd_types

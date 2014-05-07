@@ -1,7 +1,7 @@
 (* The master! *)
 open Int_types
 open Vhd_types
-open Stringext
+open Xstringext
 open Drivers
 open Threadext
 open Listext

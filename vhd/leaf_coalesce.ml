@@ -89,13 +89,13 @@ let reattach_and_stop_and_copy_on_host context metadata id leaf_uid leaf_info ho
 
 	let leaf_path =
 		if !Global.dummy
-		then Stringext.String.replace (Global.get_host_local_dummydir ()) "" leaf_path
+		then Xstringext.String.replace (Global.get_host_local_dummydir ()) "" leaf_path
 		else leaf_path
 	in
 
 	let new_leaf_path =
 		if !Global.dummy
-		then Stringext.String.replace (Global.get_host_local_dummydir ()) "" new_leaf_path
+		then Xstringext.String.replace (Global.get_host_local_dummydir ()) "" new_leaf_path
 		else new_leaf_path
 	in
 

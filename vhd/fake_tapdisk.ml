@@ -8,5 +8,5 @@ let _ =
 		"-b",Arg.Set_string base_dir,"Set the base directory";]
 	in
 	Arg.parse args (fun s -> ()) "Usage: Read the source!";
-	if not Stringext.startswith "vhd:" !vhd then
+	if not Xstringext.startswith "vhd:" !vhd then
 		failwith "Can only handle vhd: types"
