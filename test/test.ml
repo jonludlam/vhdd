@@ -1,6 +1,6 @@
 open Smapi_types
 open Int_types
-open Stringext
+open Xstringext
 
 module SC=Smapi_client
 

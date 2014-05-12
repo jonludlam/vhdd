@@ -1,4 +1,4 @@
-open Stringext
+open Xstringext
 
 module D=Debug.Make(struct let name="iscsilib" end)
 open D

@@ -1,6 +1,6 @@
 open Vhd_types
 open Threadext
-open Stringext
+open Xstringext
 open Int_types
 
 module D=Debug.Make(struct let name="attachments" end)

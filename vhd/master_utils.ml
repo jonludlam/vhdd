@@ -145,7 +145,7 @@ let get_slave_attach_info_inner context metadata id writable leaf_info =
 	in
 	let path = 
 		if !Global.dummy
-		then Stringext.String.replace (Global.get_host_local_dummydir ()) "" path
+		then Xstringext.String.replace (Global.get_host_local_dummydir ()) "" path
 		else path
 	in
 	{sa_leaf_path=path;

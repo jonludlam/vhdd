@@ -1,6 +1,6 @@
 (* Abstraction of LVM *)
 open Listext
-open Stringext
+open Xstringext
 open Int_types
 open Lvmabs_types
 

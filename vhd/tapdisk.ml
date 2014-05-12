@@ -1,4 +1,4 @@
-open Stringext
+open Xstringext
 open Listext
 open Threadext
 

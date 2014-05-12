@@ -1,6 +1,6 @@
 (* Very similar to vhdutil.py! *)
 
-open Stringext
+open Xstringext
 open Int64
 
 module D = Debug.Make(struct let name="vhdutil" end)

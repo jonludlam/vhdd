@@ -1,5 +1,5 @@
 (* Original LVM functions *)
-open Stringext
+open Xstringext
 open Listext
 open Fun
 
@@ -180,8 +180,8 @@ let getenv config_name =
 
 let get_dm_name vg lv_name =
 	let vg_name = vg.vg_name in
-	let vgname = String.concat "--" (Stringext.String.split '-' vg_name) in
-	let lvname = String.concat "--" (Stringext.String.split '-' lv_name) in
+	let vgname = String.concat "--" (Xstringext.String.split '-' vg_name) in
+	let lvname = String.concat "--" (Xstringext.String.split '-' lv_name) in
 	Printf.sprintf "%s-%s" vgname lvname
 
 let get_dm_path vg lv_name =
@@ -439,7 +439,7 @@ let resize_lv vg lv_name size =
 	"-C";"-o";"size";"--noheadings";"--units";"m"] in
 	(* Returns something of the form: "   40.00M\n" *)
 	let cur_mb = String.sub out 0 (String.index out '.') in
-	let cur_mb = Stringext.String.strip Stringext.String.isspace cur_mb in
+	let cur_mb = Xstringext.String.strip Xstringext.String.isspace cur_mb in
 	let cur_mb = Int64.of_string cur_mb in
 
 	let size_mb_rounded = Int64.mul 4L (Int64.div (Int64.add size_mb 3L) 4L) in
