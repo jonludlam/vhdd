@@ -33,8 +33,9 @@ let xmlrpc_handler req fd () =
 		c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); 
 		c_other_info=[]; }) in
 	Tracelog.append context (Tracelog.SmapiCall {Tracelog.path=path; body=body; call=rpc.Rpc.name}) None;
-	Debug.associate_thread_with_task context.Context.c_task_id;
-	let result = S.process context rpc in
+	let result =
+		Debug.with_thread_associated context.Context.c_task_id
+		(S.process context) rpc in
 	let str = Xmlrpc.string_of_response result in
 	Tracelog.append context (Tracelog.SmapiResult {Tracelog.result=str;}) None;
 	Tracelog.dump "/tmp/tracelog";
@@ -50,9 +51,10 @@ let internal_handler req fd () =
 	(* Extract some info from the XML before we pass it to process *)
 (*	let call,args = XMLRPC.From.methodCall xml in*)
 	let context = Context.({c_driver="unknown"; c_api_call=""; c_task_id=(match req.Http.Request.task with Some x -> x | None -> Uuidm.to_string (Uuidm.create Uuidm.(`V4))); c_other_info=[] }) in
-	Debug.associate_thread_with_task context.Context.c_task_id;
 	(*Tracelog.append context (Tracelog.InternalCall (body, call)) None;*)
-	let result = Int_server.S.process context call in
+	let result =
+		Debug.with_thread_associated context.Context.c_task_id
+		(Int_server.S.process context) call in
 	let str = Jsonrpc.string_of_response result in
 (*	Tracelog.append context (Tracelog.InternalResult str) None;*)
 	debug "Response: %s" str;
